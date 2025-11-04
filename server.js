@@ -106,12 +106,50 @@ function guardarProducts(data) {
 
 // Listar productos o filtrar por categoría
 app.get('/api/products', (req, res) => {
-  const data = leerProducts();
-  const categoria = req.query.categoria;
-  if (categoria) {
-    return res.json(data.products.filter(p => p.categoria === categoria));
+  try {
+    console.log('[API] GET /api/products -> PRODUCTS_FILE=', PRODUCTS_FILE, 'exists=', fs.existsSync(PRODUCTS_FILE));
+    const data = leerProducts();
+    const categoria = req.query.categoria;
+    if (categoria) {
+      return res.json(data.products.filter(p => p.categoria === categoria));
+    }
+    return res.json(data.products);
+  } catch (e) {
+    console.error('[API] Error leyendo products:', e);
+    res.status(500).json({ error: 'Error leyendo products', detail: e.message });
   }
-  res.json(data.products);
+});
+
+// Endpoint de diagnóstico rápido para verificar paths/archivos en el entorno (útil en Render)
+app.get('/api/health', (req, res) => {
+  try {
+    const productsExists = fs.existsSync(PRODUCTS_FILE);
+    const pedidosExists = fs.existsSync(PEDIDOS_FILE);
+    const productsStat = productsExists ? fs.statSync(PRODUCTS_FILE) : null;
+    const pedidosStat = pedidosExists ? fs.statSync(PEDIDOS_FILE) : null;
+    res.json({
+      ok: true,
+      env: {
+        PORT: process.env.PORT || null,
+        BASE_URL: process.env.BASE_URL || null,
+        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? '***SET***' : null,
+        STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY ? '***SET***' : null
+      },
+      server: {
+        __dirname,
+        dataDir: DATA_DIR,
+        productsFile: PRODUCTS_FILE,
+        productsExists,
+        productsStat: productsStat && { size: productsStat.size, mtime: productsStat.mtime },
+        pedidosFile: PEDIDOS_FILE,
+        pedidosExists,
+        pedidosStat: pedidosStat && { size: pedidosStat.size, mtime: pedidosStat.mtime }
+      }
+    });
+  } catch (err) {
+    console.error('Error en /api/health', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // Crear nuevo producto
