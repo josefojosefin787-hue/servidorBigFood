@@ -16,7 +16,13 @@ try {
   console.warn('No se pudo inicializar Stripe:', e.message);
   stripe = null;
 }
-const nodemailer = require('nodemailer');
+let nodemailer = null;
+try {
+  nodemailer = require('nodemailer');
+} catch (e) {
+  console.warn('nodemailer no está instalado — las funciones de email estarán deshabilitadas.');
+  nodemailer = null;
+}
 
 const app = express();
 app.use(cors());
@@ -149,6 +155,10 @@ app.delete('/api/products/:id', (req, res) => {
 let mailTransport = null;
 (async () => {
   try {
+    if (!nodemailer) {
+      console.log('nodemailer no disponible — saltando configuración de transporte de correo.');
+      return;
+    }
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       mailTransport = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -347,8 +357,9 @@ app.post('/admin/simulate-payment', async (req, res) => {
     if (mailTransport && pedido.email) {
       const html = `<h2>Comprobante de pago - Pedido #${pedido.id}</h2><p>Cliente: ${pedido.cliente}</p><ul>${pedido.items.map(i=>`<li>${i.cantidad} x ${i.nombre} - $${i.precio * i.cantidad}</li>`).join('')}</ul><p><strong>Total: $${pedido.total}</strong></p>`;
       const info = await mailTransport.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: pedido.email, subject: `Comprobante de pago - Pedido #${pedido.id}`, html });
-      console.log('Simulated payment mail sent:', info.messageId);
-      if (nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+  console.log('Simulated payment mail sent:', info.messageId);
+  if (nodemailer && nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+            if (nodemailer && nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
     }
 
     return res.json({ status: 'ok', pedido });
