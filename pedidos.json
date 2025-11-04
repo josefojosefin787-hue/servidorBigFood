@@ -1,0 +1,604 @@
+[
+  {
+    "id": 1,
+    "cliente": "Sebastian Salas",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 3
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 3
+      }
+    ],
+    "total": 9000,
+    "estado": "listo",
+    "fecha": "2025-09-26T20:48:24.132Z"
+  },
+  {
+    "id": 2,
+    "cliente": "qwertyu",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 3
+      }
+    ],
+    "total": 3600,
+    "estado": "listo",
+    "fecha": "2025-09-26T20:49:12.214Z"
+  },
+  {
+    "id": 3,
+    "cliente": "sdfghj",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 3
+      }
+    ],
+    "total": 3600,
+    "estado": "listo",
+    "fecha": "2025-09-26T20:50:24.989Z"
+  },
+  {
+    "id": 4,
+    "cliente": "dfff",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 3
+      },
+      {
+        "id": 3,
+        "nombre": "Muffin de chocolate",
+        "precio": 900,
+        "cantidad": 2
+      }
+    ],
+    "total": 5400,
+    "estado": "listo",
+    "fecha": "2025-09-26T20:50:37.803Z"
+  },
+  {
+    "id": 5,
+    "cliente": "gonzalo",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 1
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 3000,
+    "estado": "listo",
+    "fecha": "2025-10-13T18:31:25.750Z",
+    "sessionId": "cs_test_b1aD9tNNXHrNcSufbQ6de4uAIkmJ9ztLBqgvjNiKE2bXJjsYgiSvsQ2KOP"
+  },
+  {
+    "id": 6,
+    "cliente": "gonzalo",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 1
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 3000,
+    "estado": "listo",
+    "fecha": "2025-10-13T18:36:08.970Z",
+    "sessionId": "cs_test_b1eKgKCN6JRdOecfacTEGfRQYcj5f0nBCTwNCQ0RTJEkKYjt0ZbOEp6qeJ"
+  },
+  {
+    "id": 7,
+    "cliente": "gonzalo",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 1
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 3000,
+    "estado": "listo",
+    "fecha": "2025-10-13T18:36:10.193Z",
+    "sessionId": "cs_test_b11Ke1odrwvlB9ssZJ3hzTGDurG9KeMeibGCeUD7VafoSu3yvdLrAkm2q1"
+  },
+  {
+    "id": 8,
+    "cliente": "gonzalo",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 1
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 3000,
+    "estado": "listo",
+    "fecha": "2025-10-13T18:36:10.808Z",
+    "sessionId": "cs_test_b13BGXf2hR0xFsUvwQzt5QyrkhTzXfotg6e9adwNpI1gkeqYGBMht3wenT"
+  },
+  {
+    "id": 9,
+    "cliente": "sebastian salas",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      },
+      {
+        "id": 3,
+        "nombre": "Muffin de chocolate",
+        "precio": 900,
+        "cantidad": 1
+      }
+    ],
+    "total": 2700,
+    "estado": "listo",
+    "fecha": "2025-10-14T18:58:05.017Z",
+    "sessionId": "cs_test_b11LKdET2dlH75Nbl5vfJQBnFks15VAHvMzSwkyNXnZJOPtctn85DVKKBg"
+  },
+  {
+    "id": 10,
+    "cliente": "Chao",
+    "email": "chaohola@gmail.com",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 1
+      },
+      {
+        "id": 4,
+        "nombre": "Té verde",
+        "precio": 1000,
+        "cantidad": 1
+      },
+      {
+        "id": 3,
+        "nombre": "Muffin de chocolate",
+        "precio": 900,
+        "cantidad": 1
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 4900,
+    "estado": "listo",
+    "fecha": "2025-10-14T19:07:38.838Z",
+    "sessionId": "cs_test_b1a20vwObjxkixFxccwn0jO2b5RELfckoH6aVCCVPC4BlWMFEax0uY7BqD"
+  },
+  {
+    "id": 11,
+    "cliente": "asdasd",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 1,
+        "nombre": "Café americano",
+        "precio": 1200,
+        "cantidad": 1
+      },
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 3000,
+    "estado": "listo",
+    "fecha": "2025-10-14T19:25:55.516Z",
+    "sessionId": "cs_test_b1EBhtCbbeYvbY1xVj1g3zLTeKQnFKyl2dc2nGxnmBRAURDbRKe4iKw8ec"
+  },
+  {
+    "id": 12,
+    "cliente": "miguel",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 4,
+        "nombre": "Té verde",
+        "precio": 1000,
+        "cantidad": 1
+      },
+      {
+        "id": 3,
+        "nombre": "Muffin de chocolate",
+        "precio": 900,
+        "cantidad": 1
+      }
+    ],
+    "total": 1900,
+    "estado": "listo",
+    "fecha": "2025-10-14T19:33:54.952Z",
+    "sessionId": "cs_test_b1LCHAPIwmVpuIJfATCXdixe8Zd3pA0G2MzWH7SGMJC0htXGkrq9zMS9i1"
+  },
+  {
+    "id": 13,
+    "cliente": "miguel",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 4,
+        "nombre": "Té verde",
+        "precio": 1000,
+        "cantidad": 1
+      },
+      {
+        "id": 3,
+        "nombre": "Muffin de chocolate",
+        "precio": 900,
+        "cantidad": 1
+      }
+    ],
+    "total": 1900,
+    "estado": "listo",
+    "fecha": "2025-10-14T19:33:55.734Z",
+    "sessionId": "cs_test_b1q8SuEXsoGriVTiyXCreRtiCqPQnjisMK25lPZ6Krvx9arxLZZaq6EkWn"
+  },
+  {
+    "id": 14,
+    "cliente": "sebastian",
+    "email": "seba.salas53@gmail.com",
+    "items": [
+      {
+        "id": 2,
+        "nombre": "Capuccino",
+        "precio": 1800,
+        "cantidad": 1
+      }
+    ],
+    "total": 1800,
+    "estado": "listo",
+    "fecha": "2025-10-15T02:50:52.517Z",
+    "sessionId": "cs_test_a181fQRI0jJFBdv9JVBM4oQPFkyExrOM322qXANsYBKzjmwwHwmmcFVtCQ"
+  },
+  {
+    "id": 15,
+    "cliente": "Sebastian",
+    "email": "abraham10aima21as@gmail.com",
+    "items": [
+      {
+        "id": 60,
+        "nombre": "Fideos a la boloñesa",
+        "precio": 4200,
+        "cantidad": 1
+      },
+      {
+        "id": 40,
+        "nombre": "Barra de chocolate",
+        "precio": 1100,
+        "cantidad": 1
+      },
+      {
+        "id": 21,
+        "nombre": "Empanada de pino",
+        "precio": 900,
+        "cantidad": 1
+      },
+      {
+        "id": 20,
+        "nombre": "Completo Italiano",
+        "precio": 2500,
+        "cantidad": 1
+      }
+    ],
+    "total": 8700,
+    "estado": "listo",
+    "fecha": "2025-10-21T04:57:08.827Z",
+    "sessionId": "cs_test_b1oxacQS2SxMj5JibzctTszdG3JsXuBUJ8Txc4RcQO7JHSUQq44jtx1usd"
+  },
+  {
+    "id": 16,
+    "cliente": "ABraham",
+    "email": "amirandaa2@alumnos.ceduc.cl",
+    "items": [
+      {
+        "id": 25,
+        "nombre": "Empanada de pino",
+        "precio": 900,
+        "cantidad": 1
+      },
+      {
+        "id": 26,
+        "nombre": "Empanada de queso",
+        "precio": 900,
+        "cantidad": 1
+      }
+    ],
+    "total": 1800,
+    "metodoPago": "junaeb",
+    "nota": "",
+    "estado": "pendiente_pago",
+    "fecha": "2025-10-25T18:11:17.121Z"
+  },
+  {
+    "id": 17,
+    "cliente": "PABLO ANDRES",
+    "email": "a@gmail.com",
+    "items": [
+      {
+        "id": 41,
+        "nombre": "Bombones surtidos (caja)",
+        "precio": 2500,
+        "cantidad": 1
+      }
+    ],
+    "total": 2500,
+    "metodoPago": "efectivo",
+    "nota": "",
+    "estado": "pendiente_pago",
+    "fecha": "2025-10-25T18:12:24.748Z"
+  },
+  {
+    "id": 18,
+    "cliente": "PABLO ANDRES",
+    "email": "pablomarinv77@gmail.com",
+    "items": [
+      {
+        "id": 32,
+        "nombre": "Galletas surtidas (paquete)",
+        "precio": 800,
+        "cantidad": 1
+      }
+    ],
+    "total": 800,
+    "metodoPago": "efectivo",
+    "nota": "",
+    "estado": "Garantizado - Pendiente de Retiro",
+    "paymentIntentId": "pi_3SMOHwE06U1NNw231FWBLhXb",
+    "fecha": "2025-10-26T07:22:53.259Z"
+  },
+  {
+    "id": 19,
+    "cliente": "Jose",
+    "email": "jose3254as@gmail.com",
+    "items": [
+      {
+        "id": 61,
+        "nombre": "Puré con pollo arvejado",
+        "precio": 4800,
+        "cantidad": 1
+      }
+    ],
+    "total": 4800,
+    "metodoPago": "junaeb",
+    "nota": "",
+    "estado": "listo",
+    "paymentIntentId": "pi_3SMOItE06U1NNw230w9IzDqW",
+    "fecha": "2025-10-26T07:23:51.354Z"
+  },
+  {
+    "id": 20,
+    "cliente": "ABraham",
+    "email": "amirandaa2@alumnos.ceduc.cl",
+    "items": [
+      {
+        "id": 6,
+        "nombre": "Gaseosa 350ml",
+        "precio": 900,
+        "cantidad": 1
+      },
+      {
+        "id": 61,
+        "nombre": "Puré con pollo arvejado",
+        "precio": 4800,
+        "cantidad": 1
+      }
+    ],
+    "total": 5700,
+    "metodoPago": "efectivo",
+    "nota": "",
+    "estado": "listo",
+    "paymentIntentId": "pi_3SMYXYE06U1NNw2307MkKOSn",
+    "fecha": "2025-10-26T18:19:40.493Z"
+  },
+  {
+    "id": 21,
+    "cliente": "Jose",
+    "email": "jose3254as@gmail.com",
+    "items": [
+      {
+        "id": 2,
+        "nombre": "Capuchino",
+        "precio": 1800,
+        "cantidad": 1
+      },
+      {
+        "id": 3,
+        "nombre": "Latte grande",
+        "precio": 2000,
+        "cantidad": 1
+      },
+      {
+        "id": 4,
+        "nombre": "Té verde",
+        "precio": 1000,
+        "cantidad": 1
+      },
+      {
+        "id": 7,
+        "nombre": "Agua mineral 500ml",
+        "precio": 700,
+        "cantidad": 7
+      }
+    ],
+    "total": 9700,
+    "metodoPago": "junaeb",
+    "nota": "",
+    "estado": "listo",
+    "paymentIntentId": "pi_3SN3FxE06U1NNw230IJaVzg3",
+    "fecha": "2025-10-28T03:07:33.843Z"
+  },
+  {
+    "id": 22,
+    "cliente": "willy",
+    "email": "willires@gmail.com",
+    "items": [
+      {
+        "id": 208,
+        "nombre": "Capuccino",
+        "precio": 1200,
+        "cantidad": 2
+      }
+    ],
+    "total": 2400,
+    "estado": "esperando_pago",
+    "fecha": "2025-10-29T20:53:14.959Z",
+    "sessionId": "cs_test_a1VxwEdcxghxDb8UTdXrHZAjlK0zLWTuycayYVm9Ett73H3nkWOcvHu0v2"
+  },
+  {
+    "id": 23,
+    "cliente": "josefin",
+    "email": "josefin@gmail.com",
+    "items": [
+      {
+        "id": 211,
+        "nombre": "Gaseosa 350ml",
+        "precio": 1000,
+        "cantidad": 1
+      },
+      {
+        "id": 221,
+        "nombre": "Completo italiano",
+        "precio": 2200,
+        "cantidad": 1
+      }
+    ],
+    "total": 3200,
+    "estado": "listo",
+    "fecha": "2025-10-29T20:54:19.195Z",
+    "sessionId": "cs_test_b1imC53gDY8yQbzxAunWkLpKheCcmvT6Hzkhf0NjtScuXma3jv0umqzvSv"
+  },
+  {
+    "id": 24,
+    "cliente": "josefin",
+    "email": "josefin@gmail.com",
+    "items": [
+      {
+        "id": 222,
+        "nombre": "Completo Chucrut",
+        "precio": 1500,
+        "cantidad": 1
+      },
+      {
+        "id": 212,
+        "nombre": "Agua mineral",
+        "precio": 1000,
+        "cantidad": 1
+      },
+      {
+        "id": 211,
+        "nombre": "Gaseosa 350ml",
+        "precio": 1000,
+        "cantidad": 1
+      }
+    ],
+    "total": 3500,
+    "estado": "esperando_pago",
+    "fecha": "2025-11-04T19:03:00.755Z",
+    "sessionId": "cs_test_b15HuSGmEbajxTXDwN1VEE3O8T2zjsDx3UJq7FLHd00WcmCSuYInF2HCfh"
+  },
+  {
+    "id": 25,
+    "cliente": "josefin",
+    "email": "josefin@gmail.com",
+    "items": [
+      {
+        "id": 208,
+        "nombre": "Capuccino",
+        "precio": 1200,
+        "cantidad": 2
+      },
+      {
+        "id": 207,
+        "nombre": "Latte grande",
+        "precio": 1200,
+        "cantidad": 1
+      }
+    ],
+    "total": 3600,
+    "metodoPago": "efectivo",
+    "nota": "",
+    "estado": "Garantizado - Pendiente de Retiro",
+    "paymentIntentId": "pi_3SPpb5E06U1NNw230FpiisbW",
+    "fecha": "2025-11-04T19:08:52.817Z"
+  },
+  {
+    "id": 26,
+    "cliente": "josefin",
+    "email": "josefin@gmail.com",
+    "items": [
+      {
+        "id": 207,
+        "nombre": "Latte grande",
+        "precio": 1200,
+        "cantidad": 2
+      },
+      {
+        "id": 208,
+        "nombre": "Capuccino",
+        "precio": 1200,
+        "cantidad": 2
+      }
+    ],
+    "total": 4800,
+    "estado": "esperando_pago",
+    "fecha": "2025-11-04T23:31:25.959Z",
+    "sessionId": "cs_test_b1fCzpVked68m6ecQPffVsflV1joOuAdqgrYzS6XTJnjKllBLfMTSNnFYo"
+  }
+]
