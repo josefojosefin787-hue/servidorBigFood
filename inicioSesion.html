@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido a BigFood</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="theme-switch-wrapper">
+      <label class="theme-switch" for="checkbox">
+        <input type="checkbox" id="checkbox" />
+        <div class="slider"></div>
+      </label>
+    </div>
+
+    <div class="fondo-animado">
+        <img src="img/hamburguesa.png" class="icono comida1">
+        <img src="img/hotdog.png" class="icono comida2">
+        <img src="img/jugo.png" class="icono comida3">
+        <img src="img/papas.png" class="icono comida4">
+        <img src="img/pizza.png" class="icono comida5">
+
+        <img src="img/hamburguesa.png" class="icono comida1">
+        <img src="img/hotdog.png" class="icono comida2">
+        <img src="img/jugo.png" class="icono comida3">
+        <img src="img/papas.png" class="icono comida4">
+        <img src="img/pizza.png" class="icono comida5">
+
+        <img src="img/hamburguesa.png" class="icono comida1">
+        <img src="img/hotdog.png" class="icono comida2">
+        <img src="img/jugo.png" class="icono comida3">
+        <img src="img/papas.png" class="icono comida4">
+        <img src="img/pizza.png" class="icono comida5">
+
+        <img src="img/hamburguesa.png" class="icono comida1">
+        <img src="img/hotdog.png" class="icono comida2">
+        <img src="img/jugo.png" class="icono comida3">
+        <img src="img/papas.png" class="icono comida4">
+        <img src="img/pizza.png" class="icono comida5">
+
+        <img src="img/hamburguesa.png" class="icono comida1">
+        <img src="img/hotdog.png" class="icono comida2">
+        <img src="img/jugo.png" class="icono comida3">
+        <img src="img/papas.png" class="icono comida4">
+        <img src="img/pizza.png" class="icono comida5">
+    </div>
+    <div class="contenedor contenedor-login"> 
+        <div class="contenedor-titulo">
+            <h1 class="titulo animate-title">Bienvenido a</h1>
+            <h1 class="titulo2 logo-estilo animate-logo">Webstorant</h1>
+        </div>
+
+        <form class="cont-formulario" action="pagina2.html" method="GET">
+            <input type="text" class="input" id="nombre" name="nombre" placeholder="Ingresa tu Nombre / Apellido" required>
+            <input type="submit" value="Ingresar" class="boton-enviar boton-principal" id="ingresar">
+        </form>
+
+        <div class="menu-content">
+            <span class="menu-item" id="menu">
+                <i class="fas fa-plus"></i>
+            </span>
+            <a href="#" target="_blank" class="menu-item">
+                <img src="./svg/facebook.svg" alt="Facebook">
+            </a>
+            <a href="#" target="_blank" class="menu-item">
+                <img src="./svg/instagram.svg" alt="Instagram">
+            </a>
+            <a href="#" target="_blank" class="menu-item">
+                <img src="./svg/youtube.svg" alt="Youtube">
+            </a>
+        </div>
+        <script>
+            const btnMenu = document.querySelector('#menu'),
+                menuContent = document.querySelector('.menu-content');
+
+            btnMenu.addEventListener('click', () => {
+                menuContent.classList.toggle('menu-active');
+            });
+        </script>
+    </div>
+
+    <script>
+    // Control del tema oscuro
+    const toggleSwitch = document.querySelector('#checkbox');
+    
+    // Verificar si hay una preferencia guardada
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme) {
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        if (currentTheme === 'dark') {
+            toggleSwitch.checked = true;
+        }
+    }
+
+    toggleSwitch.addEventListener('change', function(e) {
+        if (e.target.checked) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+        }
+    });
+
+    const iconos = document.querySelectorAll('.fondo-animado .icono');
+
+        iconos.forEach(icono => {
+            // Posición horizontal aleatoria
+            icono.style.left = Math.random() * 100 + '%';
+
+            // Posición vertical inicial aleatoria para que ya estén cayendo
+            icono.style.top = -Math.random() * 100 + 'vh';
+
+            // Duración de la caída aleatoria (10 a 20 segundos)
+            const duracion = 10 + Math.random() * 10;
+            icono.style.animationDuration = duracion + 's';
+
+            // Retraso aleatorio (0 a 5 segundos)
+            icono.style.animationDelay = Math.random() * 5 + 's';
+        });
+
+    </script>
+</body>
+
+</html>
+
+   

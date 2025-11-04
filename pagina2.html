@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Menú Cafetería - Pedido</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://js.stripe.com/v3/"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
+  
+</head>
+
+<body>
+  <div class="fondo-animado">
+    <img src="img/hamburguesa.png" class="icono comida1">
+    <img src="img/hotdog.png" class="icono comida2">
+    <img src="img/jugo.png" class="icono comida3">
+    <img src="img/papas.png" class="icono comida4">
+    <img src="img/pizza.png" class="icono comida5">
+
+    <img src="img/hamburguesa.png" class="icono comida1">
+    <img src="img/hotdog.png" class="icono comida2">
+    <img src="img/jugo.png" class="icono comida3">
+    <img src="img/papas.png" class="icono comida4">
+    <img src="img/pizza.png" class="icono comida5">
+
+    <img src="img/hamburguesa.png" class="icono comida1">
+    <img src="img/hotdog.png" class="icono comida2">
+    <img src="img/jugo.png" class="icono comida3">
+    <img src="img/papas.png" class="icono comida4">
+    <img src="img/pizza.png" class="icono comida5">
+
+    <img src="img/hamburguesa.png" class="icono comida1">
+    <img src="img/hotdog.png" class="icono comida2">
+    <img src="img/jugo.png" class="icono comida3">
+    <img src="img/papas.png" class="icono comida4">
+    <img src="img/pizza.png" class="icono comida5">
+
+    <img src="img/hamburguesa.png" class="icono comida1">
+    <img src="img/hotdog.png" class="icono comida2">
+    <img src="img/jugo.png" class="icono comida3">
+    <img src="img/papas.png" class="icono comida4">
+    <img src="img/pizza.png" class="icono comida5">
+  </div>
+  <div class="lado-izquierdo">
+    <div class="theme-switch-wrapper">
+      <label class="theme-switch" for="checkbox">
+        <input type="checkbox" id="checkbox" />
+        <div class="slider"></div>
+      </label>
+    </div>
+    <div class="contenedor-titulo">
+      <h1 class="titulo">Menú de la Cafetería</h1>
+      <h2 class="titulo2">BigFood</h2>
+    </div>
+  </div>
+
+  <div class="lado-derecho">
+    <div class="contenedor">
+  <h2 class="seleccion">Selecciona una categoría</h2>
+
+    <div class="tabs" id="categoriaTabs">
+      <button class="tab" data-cat="bebidas">
+        <img src="img/bebidas.jpg" alt="Bebidas">
+        <span>Bebidas</span>
+      </button>
+      <button class="tab" data-cat="postres">
+        <img src="img/postres.jpg" alt="Postres">
+        <span>Postres</span>
+      </button>
+      <button class="tab" data-cat="comida rapida">
+        <img src="img/comidaRapida.jpg" alt="Comida rápida">
+        <span>Comida rápida</span>
+      </button>
+      <button class="tab" data-cat="galletas">
+        <img src="img/galletas.jpeg" alt="Galletas">
+        <span>Galletas</span>
+      </button>
+      <button class="tab" data-cat="chocolates">
+        <img src="img/chocolates.jpg" alt="Chocolates">
+        <span>Chocolates</span>
+      </button>
+      <button class="tab" data-cat="confiteria">
+        <img src="img/confites.jpeg" alt="Confitería">
+        <span>Confitería</span>
+      </button>
+      <button class="tab" data-cat="almuerzos">
+        <img src="img/almuerzos.jpg" alt="Almuerzos">
+        <span>Almuerzos</span>
+      </button>
+    </div>
+
+  <main class="main-layout">
+      
+  
+      
+
+  <aside class="aside-cart">
+        <div class="carrito" id="carritoBox">
+          <h3 style="color:#139147;">Carrito</h3>
+          <div id="carritoItems"></div>
+          <div><strong>Total: $<span id="total">0</span></strong></div>
+          <input id="cliente" class="input" placeholder="Tu nombre" />
+          <input id="email" class="input" placeholder="Correo electrónico (recibirás el comprobante)" />
+          <textarea id="notaPedido" class="input" placeholder="Notas del pedido (opcional)" rows="3"></textarea>
+          <label for="metodoPago" style="display:block;margin:8px 0 4px 0;font-weight:600">Método de pago</label>
+          <select id="metodoPago" class="input">
+            <option value="card">Tarjeta (online)</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="junaeb">JUNAEB</option>
+          </select>
+          <!-- Sección para tarjeta de garantía (solo visible si el cliente elige pago presencial) -->
+          <div id="card-section" style="display:none;margin-top:8px;">
+            <label style="font-weight:600">Tarjeta de garantía (no se cobrará ahora)</label>
+            <div id="card-element" style="padding:12px;border:1px solid #ddd;border-radius:6px;background:#fff;margin-top:6px;"></div>
+            <div id="card-errors" role="alert" style="color:#b71c1c;margin-top:6px;"></div>
+          </div>
+          <input id="enviar" type="button" class="enviar" value="Pagar con tarjeta" />
+        </div>
+      </aside>
+    </main>
+    </div>
+  </div>
+
+  <div class="menu-content">
+    <span class="menu-item" id="menu" title="Más">
+      <img src="./svg/plus.svg" alt="Más">
+    </span>
+    <a href="#" target="_blank" class="menu-item" title="Facebook">
+      <img src="./svg/facebook.svg" alt="Facebook">
+    </a>
+    <a href="#" target="_blank" class="menu-item" title="Instagram">
+      <img src="./svg/instagram.svg" alt="Instagram">
+    </a>
+    <a href="#" target="_blank" class="menu-item" title="Youtube">
+      <img src="./svg/youtube.svg" alt="Youtube">
+    </a>
+  </div>
+
+  <script>
+    // === CONTROL DE TEMA OSCURO ===
+    const toggleSwitch = document.querySelector('#checkbox');
+    
+    // Verificar si hay una preferencia guardada
+    const currentTheme = localStorage.getItem('theme');
+    if (currentTheme) {
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        if (currentTheme === 'dark') {
+            toggleSwitch.checked = true;
+        }
+    }
+
+    toggleSwitch.addEventListener('change', function(e) {
+        if (e.target.checked) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+        }
+    });
+
+    // === MENÚ Y CARRITO ===
+    const btnMenu = document.querySelector('#menu'),
+      menuContent = document.querySelector('.menu-content');
+    btnMenu.addEventListener('click', () => {
+      menuContent.classList.toggle('menu-active');
+    });
+
+    // Base para las rutas de imagen
+    const IMAGES_BASE = (window.location.protocol === 'file:') ? './imagenes' : '/imagenes';
+    const PLACEHOLDER = IMAGES_BASE + '/placeholder.svg';
+
+  let productos = [];
+  // Iniciamos carrito leyendo lo que haya en localStorage (no sobrescribimos)
+  let carrito = JSON.parse(localStorage.getItem('cart') || '[]');
+
+  const carritoItems = document.getElementById('carritoItems');
+  const totalEl = document.getElementById('total');
+
+  // Stripe Elements (se inicializa en la IIFE de inicialización más abajo)
+  let stripe = null;
+  let elements = null;
+  let cardElement = null;
+  let publishableKey = null;
+
+  function mountCard() {
+    if (!elements || cardElement) return;
+    cardElement = elements.create('card', { hidePostalCode: true });
+    cardElement.mount('#card-element');
+    cardElement.on('change', (ev) => {
+      const el = document.getElementById('card-errors');
+      el.textContent = ev.error ? ev.error.message : '';
+    });
+  }
+
+  function unmountCard() {
+    if (cardElement) {
+      try { cardElement.unmount(); } catch (e) { /* ignore */ }
+      cardElement = null;
+    }
+    const el = document.getElementById('card-errors'); if (el) el.textContent = '';
+  }
+
+    async function fetchProducts() {
+      try {
+        const res = await fetch('/api/products');
+        const data = await res.json();
+        productos = data;
+        return productos;
+      } catch (e) {
+        console.error('No se pudo cargar productos', e);
+        return [];
+      }
+    }
+
+    function createModal(cat, items){
+      const modalId = `modal-${cat}`;
+      if (document.getElementById(modalId)) return;
+      const modal = document.createElement('div');
+      modal.className = 'modal'; modal.id = modalId;
+      modal.innerHTML = `
+        <div class="modal-content" role="dialog" aria-modal="true">
+          <button class="close" data-close>&times;</button>
+          <h2>${cat[0].toUpperCase()+cat.slice(1)}</h2>
+          <div class="productos-grid" data-grid></div>
+        </div>`;
+      // cerrar con botón
+      modal.querySelector('[data-close]').addEventListener('click', ()=> modal.classList.remove('active'));
+      // cerrar al hacer click en el overlay (fuera del modal-content)
+      modal.addEventListener('click', (ev)=>{ if (ev.target === modal) modal.classList.remove('active'); });
+      // construir grid de productos
+      const grid = modal.querySelector('[data-grid]');
+      items.forEach(p=>{
+        const card = document.createElement('div'); card.className='card';
+        if (!p.disponible) card.classList.add('disabled');
+        const img = p.img ? `<img src='${p.img}' alt='${p.nombre}' style='width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px' onerror="this.onerror=null;this.src='${PLACEHOLDER}'"/>` : '';
+        card.innerHTML = `${img}<h4>${p.nombre}</h4><div>$${p.precio}</div><div style="font-size:.85rem;color:#666">${p.variantes? p.variantes.join(' / '):''}</div><div style="margin-top:8px"><button ${p.disponible? '':'disabled'}>Agregar</button></div>`;
+        card.querySelector('button').addEventListener('click', ()=> addToCart(p));
+        grid.appendChild(card);
+      });
+      // añadimos el modal al body para que se superponga correctamente
+      document.body.appendChild(modal);
+    }
+
+    // cerrar cualquier modal con ESC
+    document.addEventListener('keydown', (ev)=>{ if (ev.key === 'Escape'){ document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active')); } });
+
+    function renderTabs(products){
+      const tabs = document.getElementById('categoriaTabs');
+      tabs.querySelectorAll('.tab').forEach(tab=>{
+        tab.addEventListener('click', async ()=>{
+          const cat = tab.dataset.cat;
+          const items = products.filter(p=>p.categoria === cat);
+          createModal(cat, items);
+          const modal = document.getElementById(`modal-${cat}`);
+          modal.classList.add('active');
+        });
+      });
+    }
+
+    function addToCart(product){
+      const existing = carrito.find(i=>i.id===product.id);
+      if (existing) existing.cantidad++;
+      else carrito.push({ id:product.id, nombre:product.nombre, precio:product.precio, cantidad:1 });
+      localStorage.setItem('cart', JSON.stringify(carrito));
+      updateCartUI();
+    }
+
+    function updateCartUI(){
+      carritoItems.innerHTML='';
+      let total = 0;
+      carrito.forEach(it=>{
+        total += it.precio * it.cantidad;
+        const prod = productos.find(p=>p.id===it.id) || {};
+        const div = document.createElement('div'); div.className='item';
+        div.innerHTML = `<img src="${prod.img||PLACEHOLDER}" class="cart-thumb" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"/><div>${it.cantidad} x ${it.nombre} - $${it.precio*it.cantidad}</div><div style="margin-left:auto"><button class="rm">-</button></div>`;
+        div.querySelector('.rm').addEventListener('click', ()=>{
+          it.cantidad--; if (it.cantidad<=0) carrito = carrito.filter(c=>c.id!==it.id);
+          localStorage.setItem('cart', JSON.stringify(carrito)); updateCartUI();
+        });
+        carritoItems.appendChild(div);
+      });
+      totalEl.textContent = total;
+    }
+
+    document.getElementById('enviar').addEventListener('click', async ()=>{
+      const cliente = document.getElementById('cliente').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const notaPedido = document.getElementById('notaPedido').value.trim();
+      const metodo = document.getElementById('metodoPago').value;
+      if (!cliente){ alert('Ingresa tu nombre'); return; }
+      if (!email){ alert('Ingresa un correo válido'); return; }
+      if (carrito.length===0){ alert('Carrito vacío'); return; }
+      try{
+        if (metodo === 'card'){
+          // pago con tarjeta via Stripe (checkout)
+          const res = await fetch('/api/create-checkout-session',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido }) });
+          const data = await res.json();
+          if (data.url) {
+            // Guardar último cliente y limpiar carrito local antes de redirigir a Stripe Checkout
+            try { localStorage.setItem('ultimoCliente', cliente); } catch(e) {}
+            try { localStorage.removeItem('cart'); } catch(e) {}
+            carrito = [];
+            try { updateCartUI(); } catch(e) {}
+            window.location.href = data.url;
+          }
+          else { alert('No se pudo iniciar el pago'); console.error(data); }
+        } else if (metodo === 'efectivo' || metodo === 'junaeb'){
+          // Flujo presencial con tarjeta de garantía (pre-autorización manual)
+          const total = Number(document.getElementById('total').textContent) || 0;
+          if (!publishableKey) {
+            alert('Stripe no está configurado (clave pública no disponible).');
+            return;
+          }
+
+          mountCard();
+
+          const createResp = await fetch('/api/create-payment-intent', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ amount: total, currency: 'CLP', metadata: { cliente, email } })
+          });
+          const createData = await createResp.json();
+          if (createData.error) { alert('Error creando retención: '+(createData.error.message||createData.error)); console.error(createData); return; }
+          const clientSecret = createData.clientSecret;
+          const paymentIntentId = createData.paymentIntentId;
+
+          const result = await stripe.confirmCardPayment(clientSecret, {
+            payment_method: { card: cardElement, billing_details: { name: cliente, email } }
+          });
+
+          if (result.error) {
+            document.getElementById('card-errors').textContent = result.error.message || 'Error al autorizar la tarjeta';
+            return;
+          }
+
+          const pi = result.paymentIntent;
+          if (pi && pi.status === 'requires_capture') {
+            // Crear pedido y asociar paymentIntentId al pedido
+            const res2 = await fetch('/api/pedidos', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido, metodoPago: metodo, paymentIntentId }) });
+            const data = await res2.json();
+            if (data && data.pedido && data.pedido.id) {
+              // Guardar último cliente y limpiar carrito
+              try { localStorage.setItem('ultimoCliente', cliente); } catch(e){}
+              try { localStorage.removeItem('cart'); } catch(e){}
+              window.location.href = `/success.html?pedidoId=${data.pedido.id}`;
+            } else {
+              alert('No se pudo crear el pedido tras autorizar la garantía'); console.error(data);
+            }
+          } else {
+            alert('Estado inesperado del PaymentIntent: ' + (pi?pi.status:'nulo'));
+            console.log('PaymentIntent result:', pi);
+          }
+        } else {
+          // Otros métodos: crear pedido normal
+          const res = await fetch('/api/pedidos', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido, metodoPago: metodo }) });
+          const data = await res.json();
+          if (data && data.pedido && data.pedido.id) {
+            try { localStorage.setItem('ultimoCliente', cliente); } catch(e) {}
+            try { localStorage.removeItem('cart'); } catch(e) {}
+            carrito = [];
+            try { updateCartUI(); } catch(e) {}
+            window.location.href = `/success.html?pedidoId=${data.pedido.id}`;
+          } else {
+            alert('No se pudo crear el pedido'); console.error(data);
+          }
+        }
+      }catch(e){ alert('Error conectando con el servidor: '+e.message); }
+    });
+
+    // ajustar label del botón y mostrar/ocultar campo de tarjeta según metodo seleccionado
+    document.getElementById('metodoPago').addEventListener('change', (e)=>{
+      const btn = document.getElementById('enviar');
+      const cardSection = document.getElementById('card-section');
+      if (e.target.value === 'card') {
+        btn.value = 'Pagar con tarjeta';
+        if (cardSection) cardSection.style.display = 'none';
+        unmountCard();
+      } else if (e.target.value === 'efectivo') {
+        btn.value = 'Finalizar (Efectivo)';
+        if (cardSection) cardSection.style.display = 'block';
+        mountCard();
+      } else if (e.target.value === 'junaeb') {
+        btn.value = 'Finalizar (JUNAEB)';
+        if (cardSection) cardSection.style.display = 'block';
+        mountCard();
+      }
+    });
+
+    // Inicialización: cargar productos y crear modals por categoría
+    (async ()=>{
+      const products = await fetchProducts();
+      renderTabs(products);
+      const byCat = {};
+      products.forEach(p=>{ byCat[p.categoria]=byCat[p.categoria]||[]; byCat[p.categoria].push(p); });
+      Object.keys(byCat).forEach(cat=> createModal(cat, byCat[cat]));
+      updateCartUI();
+
+      // Inicializar Stripe en frontend (obtener publishable key del backend)
+      try {
+        const cfgRes = await fetch('/api/config');
+        if (cfgRes.ok) {
+          const cfg = await cfgRes.json();
+          publishableKey = cfg.publishableKey || '';
+          if (publishableKey) {
+            stripe = Stripe(publishableKey);
+            elements = stripe.elements();
+            // no montamos el cardElement hasta que el usuario elija retiro presencial
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo inicializar Stripe en frontend:', e);
+      }
+    })();
+
+    // pequeño helper de diagnóstico para imágenes (si existe un elemento con id diagList)
+    function checkImages(){
+      const diag = document.getElementById('diagList'); if (!diag) return;
+      diag.innerHTML=''; productos.forEach(p=>{ const row=document.createElement('div'); row.textContent=p.img+' — comprobando...'; const link=document.createElement('a'); link.href=p.img; link.target='_blank'; link.style.marginLeft='8px'; link.textContent='[abrir]'; row.appendChild(link); diag.appendChild(row); const img=new Image(); img.onload=()=>{ row.textContent=p.img+' — OK'; row.appendChild(link); }; img.onerror=()=>{ row.textContent=p.img+' — MISSING'; row.style.color='#b71c1c'; row.appendChild(link); }; img.src=p.img; });
+    }
+
+    // Animación de los iconos del fondo
+    const iconos = document.querySelectorAll('.fondo-animado .icono');
+    iconos.forEach(icono => {
+        // Posición horizontal aleatoria
+        icono.style.left = Math.random() * 100 + '%';
+
+        // Posición vertical inicial aleatoria para que ya estén cayendo
+        icono.style.top = -Math.random() * 100 + 'vh';
+
+        // Duración de la caída aleatoria (10 a 20 segundos)
+        const duracion = 10 + Math.random() * 10;
+        icono.style.animationDuration = duracion + 's';
+
+        // Retraso aleatorio (0 a 5 segundos)
+        icono.style.animationDelay = Math.random() * 5 + 's';
+    });
+  </script>
+</body>
+
+</html>

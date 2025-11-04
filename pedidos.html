@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+  <meta charset="UTF-8"/>
+
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+
+  <title>Pedidos - Cafetería</title>
+
+  <link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body class="pedidos-page">
+
+  <h1>Lista de pedidos</h1>
+
+  <table>
+
+    <thead><tr><th>ID</th><th>Cliente</th><th>Items</th><th>Total</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr></thead>
+
+    <tbody id="tabla"></tbody>
+
+  </table>
+
+
+
+  <script>
+
+    async function cargar() {
+
+      const res = await fetch('/api/pedidos');
+
+      const pedidos = await res.json();
+
+      const tabla = document.getElementById('tabla');
+
+      tabla.innerHTML = '';
+
+      pedidos.slice().reverse().forEach(p => {
+
+        const tr = document.createElement('tr');
+
+        const itemsHTML = p.items.map(i=> i.cantidad+' x '+i.nombre).join('<br>');
+
+        tr.innerHTML = `<td>${p.id}</td>
+
+          <td>${p.cliente}</td>
+
+          <td>${itemsHTML}</td>
+
+          <td>$${p.total}</td>
+
+          <td>${new Date(p.fecha).toLocaleString()}</td>
+
+          <td id="estado-${p.id}">${p.estado}</td>
+
+          <td>
+
+            <button class="btn" onclick="actualizar(${p.id}, 'en preparación')">En preparación</button>
+
+            <button class="btn" onclick="actualizar(${p.id}, 'listo')">Listo</button>
+
+          </td>`;
+
+        tabla.appendChild(tr);
+
+      });
+
+    }
+
+
+
+    async function actualizar(id, estado) {
+
+      await fetch('/api/pedidos/' + id, {
+
+        method: 'PATCH',
+
+        headers: {'Content-Type':'application/json'},
+
+        body: JSON.stringify({ estado })
+
+      });
+
+      document.getElementById('estado-'+id).innerText = estado;
+
+    }
+
+
+
+    // refresco cada 3s (o puedes ajustar)
+
+    setInterval(cargar, 3000);
+
+    cargar();
+
+  </script>
+
+</body>
+
+</html>

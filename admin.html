@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Productos</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Estilos pequeños para el panel admin */
+    .cell-img-edit {
+      max-width: 260px;
+      display: inline-block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .search-container {
+      margin-bottom: 1rem;
+    }
+    #searchInput {
+      width: 100%;
+      max-width: 300px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+    #nuevoImg {
+      max-width: 420px;
+      width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body class="admin-page">
+  <header class="admin-header">
+    <div class="admin-header-content">
+      <h1>Panel de Administración</h1>
+      <p class="admin-subtitle">Gestión de productos — agrupar por categoría y editar</p>
+    </div>
+  </header>
+
+  <main class="admin-container">
+    <!-- Sección para agregar productos -->
+    <section id="controls" class="admin-section">
+      <div class="section-header">
+        <h2>Nuevo Producto</h2>
+      </div>
+
+      <div class="admin-form">
+        <input id="nuevoNombre" class="admin-input" placeholder="Nombre del producto" />
+        <input id="nuevoPrecio" class="admin-input" placeholder="Precio (ej. 1200)" type="number" />
+        <input id="nuevoImg" class="admin-input" placeholder="URL imagen (opcional)" maxlength="200" />
+
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <select id="nuevaCategoria" class="admin-select"></select>
+          <input id="nuevaCategoriaCustom" class="admin-input" placeholder="O nueva categoría (opcional)" />
+          <button id="addProduct" class="admin-button">Agregar producto</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sección de productos -->
+    <section class="admin-section">
+      <div class="section-header">
+        <h2>Productos por categoría</h2>
+      </div>
+      <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Buscar productos por nombre..." />
+      </div>
+      <div id="categoriesContainer" class="categories-container"></div>
+    </section>
+  </main>
+
+  <script>
+    const IMG_MAX = 200; // longitud máxima para URL imagen
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const nuevoImg = document.getElementById('nuevoImg');
+      if (nuevoImg) {
+        nuevoImg.title = nuevoImg.value || '';
+        nuevoImg.addEventListener('input', () => {
+          nuevoImg.title = nuevoImg.value || '';
+        });
+      }
+      load();
+    });
+
+    async function fetchProducts() {
+      const res = await fetch('/api/products');
+      if (!res.ok) throw new Error('Error al obtener productos');
+      return res.json();
+    }
+
+    function normalizeCategory(cat) {
+      if (!cat) return '';
+      const low = cat.toLowerCase().trim();
+      if (['generales', 'comidarapida', 'comida rapida'].includes(low)) return 'comida rapida';
+      return low;
+    }
+
+    function displayLabel(cat) {
+      return String(cat)
+        .split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+    }
+
+    function extractCategories(products) {
+      const set = new Set();
+      products.forEach(p => { if (p.categoria) set.add(normalizeCategory(p.categoria)); });
+      return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+    }
+
+    function makeCategorySelect(current, categories, includeBlank = false) {
+      const select = document.createElement('select');
+      select.className = 'category-select';
+      if (includeBlank) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '-- seleccionar --';
+        select.appendChild(opt);
+      }
+      categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = displayLabel(cat);
+        if (cat === current) opt.selected = true;
+        select.appendChild(opt);
+      });
+      return select;
+    }
+
+    function attachImgLimit(div) {
+      if (!div) return;
+      div.classList.add('cell-img-edit');
+      div.title = div.textContent;
+      div.addEventListener('input', () => {
+        let v = div.textContent || '';
+        if (v.length > IMG_MAX) {
+          div.textContent = v.slice(0, IMG_MAX);
+        }
+        div.title = div.textContent;
+      });
+    }
+
+    function createProductRow(product, categories, onSaved) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="cell-id">${product.id}</td>
+        <td class="cell-nombre" contenteditable>${product.nombre || ''}</td>
+        <td class="cell-img"><div class="cell-img-edit" contenteditable>${product.img || ''}</div></td>
+        <td class="cell-categoria"></td>
+        <td class="cell-precio" contenteditable>${product.precio ?? 0}</td>
+        <td class="cell-disponible"><input type="checkbox" ${product.disponible ? 'checked' : ''}></td>
+        <td class="cell-actions">
+          <button class="admin-button admin-button-small btn-save">Guardar</button>
+          <button class="admin-button admin-button-small admin-button-danger btn-delete">Eliminar</button>
+        </td>
+      `;
+
+      const catCell = tr.querySelector('.cell-categoria');
+      const select = makeCategorySelect(normalizeCategory(product.categoria), categories, true);
+      catCell.appendChild(select);
+
+      attachImgLimit(tr.querySelector('.cell-img-edit'));
+
+      tr.querySelector('.btn-save').addEventListener('click', async () => {
+        const nombre = tr.querySelector('.cell-nombre').textContent.trim();
+        const img = tr.querySelector('.cell-img-edit').textContent.trim();
+        const precio = Number(tr.querySelector('.cell-precio').textContent.trim()) || 0;
+        const categoria = normalizeCategory(select.value);
+        const disponible = tr.querySelector('.cell-disponible input').checked;
+
+        try {
+          const res = await fetch(`/api/products/${product.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre, precio, img, categoria, disponible })
+          });
+          if (!res.ok) throw new Error('Error al guardar');
+          onSaved();
+        } catch (err) {
+          alert('Fallo al guardar: ' + err.message);
+        }
+      });
+
+      tr.querySelector('.btn-delete').addEventListener('click', async () => {
+        if (!confirm('¿Eliminar producto?')) return;
+        try {
+          const res = await fetch(`/api/products/${product.id}`, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Error al eliminar');
+          onSaved();
+        } catch (err) {
+          alert('Fallo al eliminar: ' + err.message);
+        }
+      });
+
+      return tr;
+    }
+
+    async function load() {
+      try {
+        const products = await fetchProducts();
+        const categories = extractCategories(products);
+
+        const nuevaCategoria = document.getElementById('nuevaCategoria');
+        nuevaCategoria.innerHTML = '<option value="">-- seleccionar --</option>';
+        categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = displayLabel(c);
+          nuevaCategoria.appendChild(opt);
+        });
+
+        const container = document.getElementById('categoriesContainer');
+        container.innerHTML = '';
+
+        if (categories.length === 0) {
+          container.innerHTML = '<p>No hay productos.</p>';
+          return;
+        }
+
+        categories.forEach(cat => {
+          const productos = products.filter(p => normalizeCategory(p.categoria) === cat);
+          if (!productos.length) return;
+
+          const section = document.createElement('div');
+          section.className = 'category-section';
+          section.innerHTML = `
+            <div class="category-header"><h3 class="category-title">${displayLabel(cat)}</h3></div>
+            <div class="table-container">
+              <table class="category-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Imagen</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Disponible</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          `;
+          const tbody = section.querySelector('tbody');
+          productos.forEach(p => tbody.appendChild(createProductRow(p, categories, load)));
+          container.appendChild(section);
+        });
+      } catch (err) {
+        console.error(err);
+        alert('No se pudieron cargar los productos: ' + err.message);
+      }
+    }
+
+    document.getElementById('addProduct').addEventListener('click', async () => {
+      const nombre = document.getElementById('nuevoNombre').value.trim();
+      const precio = Number(document.getElementById('nuevoPrecio').value.trim()) || 0;
+      let img = document.getElementById('nuevoImg').value.trim();
+      if (img.length > IMG_MAX) img = img.slice(0, IMG_MAX);
+      const selected = document.getElementById('nuevaCategoria').value;
+      const custom = document.getElementById('nuevaCategoriaCustom').value.trim();
+      const categoria = normalizeCategory(custom || selected || '');
+
+      if (!nombre) return alert('Nombre requerido');
+
+      try {
+        const res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, precio, img, categoria })
+        });
+        if (!res.ok) throw new Error('Error al crear');
+        document.getElementById('nuevoNombre').value = '';
+        document.getElementById('nuevoPrecio').value = '';
+        document.getElementById('nuevoImg').value = '';
+        document.getElementById('nuevaCategoriaCustom').value = '';
+        load();
+      } catch (err) {
+        alert('Fallo al crear producto: ' + err.message);
+      }
+    });
+
+    // Búsqueda en tiempo real
+    document.getElementById('searchInput').addEventListener('input', e => {
+      const text = e.target.value.toLowerCase();
+      const sections = document.querySelectorAll('.category-section');
+      sections.forEach(section => {
+        const rows = section.querySelectorAll('tbody tr');
+        let visible = false;
+        rows.forEach(row => {
+          const nombre = row.querySelector('.cell-nombre').textContent.toLowerCase();
+          if (nombre.includes(text)) {
+            row.style.display = '';
+            visible = true;
+          } else {
+            row.style.display = 'none';
+          }
+        });
+        section.style.display = visible ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
