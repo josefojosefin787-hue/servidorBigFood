@@ -374,6 +374,32 @@ app.post('/api/create-payment-intent', async (req, res) => {
   }
 });
 
+// Endpoint pensado para apps móviles: crea un PaymentIntent con payment methods automáticos
+// No sobreescribe el endpoint /api/create-payment-intent (que usa capture_method: 'manual').
+// Uso recomendado desde la app móvil: POST /mobile/create-payment-intent { amount, currency, metadata }
+app.post('/mobile/create-payment-intent', async (req, res) => {
+  try {
+    if (!stripe) return res.status(500).json({ error: 'Stripe no configurado en este entorno' });
+    const { amount, currency = 'CLP', metadata } = req.body;
+    console.log('[API] /mobile/create-payment-intent body=', JSON.stringify(req.body));
+    if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Amount inválido' });
+
+    // Crear PaymentIntent con métodos automáticos (Stripe decide los payment methods compatibles)
+    const pi = await stripe.paymentIntents.create({
+      amount: Math.round(Number(amount)),
+      currency: (currency || 'clp').toLowerCase(),
+      automatic_payment_methods: { enabled: true },
+      metadata: metadata || {}
+    });
+
+    console.log('[API] Mobile PaymentIntent creado:', pi.id, 'amount=', pi.amount, 'currency=', pi.currency);
+    res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
+  } catch (err) {
+    console.error('mobile create-payment-intent error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint simple para exponer la publishable key al frontend (código sin cambios)
 app.get('/api/config', (req, res) => {
   res.json({ publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51SGsL4E06U1NNw23MU9zuqRK2hu2y5pEAWwSdGNOug8gQpvLP3yJ2WcsfYO77MEcuQfvxC7WRCVicP1zVzJQc1AP00Nv7qFCgD' });
