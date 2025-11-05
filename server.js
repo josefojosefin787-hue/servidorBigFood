@@ -36,7 +36,39 @@ app.use(bodyParser.json({
 }));
 app.use(express.static(path.join(__dirname)));
 
-const DATA_DIR = path.join(__dirname, 'data');
+// Determinar dinámicamente DATA_DIR: preferimos una carpeta `data` con products.json completo
+function chooseDataDir() {
+  const candidates = [
+    path.join(__dirname, 'data'),
+    path.join(__dirname, '..', 'data'),
+    path.join(__dirname, '..', '..', 'data'),
+    path.join(__dirname, 'totemDeCafeteria', 'data'),
+    path.join(__dirname, '..', 'totemDeCafeteria', 'data'),
+    path.join(__dirname, '..', '..', 'totemDeCafeteria', 'data'),
+    path.join(__dirname, 'totemDeCafeteria.V2', 'totemDeCafeteria', 'data'),
+    path.join(__dirname, '..', 'totemDeCafeteria.V2', 'totemDeCafeteria', 'data')
+  ];
+
+  let best = null;
+  let bestSize = 0;
+  for (const cand of candidates) {
+    try {
+      const prodFile = path.join(cand, 'products.json');
+      if (fs.existsSync(prodFile)) {
+        const st = fs.statSync(prodFile);
+        if (st.size > bestSize) { bestSize = st.size; best = cand; }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  // si encontramos una carpeta con productos razonables, la usamos
+  if (best) return best;
+  // fallback: crear data en __dirname/data
+  return path.join(__dirname, 'data');
+}
+
+const DATA_DIR = chooseDataDir();
 const PEDIDOS_FILE = path.join(DATA_DIR, 'pedidos.json');
 // Nuevo directorio para archivos de pedidos diarios
 const ARCHIVE_DIR = path.join(DATA_DIR, 'pedidos_archivados');
