@@ -122,6 +122,51 @@ function archivarYLimpiarPedidos() {
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 if (!fs.existsSync(PRODUCTS_FILE)) fs.writeFileSync(PRODUCTS_FILE, JSON.stringify({ nextId: 1, products: [] }, null, 2));
 
+// Si el products.json actual es muy pequeño (placeholder), intentar copiar uno "real" desde el repo
+function findSourceProductsFile() {
+  const candidates = [
+    path.join(__dirname, 'data', 'products.json'),
+    path.join(__dirname, '..', 'data', 'products.json'),
+    path.join(__dirname, '..', '..', 'data', 'products.json'),
+    path.join(__dirname, 'totemDeCafeteria', 'data', 'products.json'),
+    path.join(__dirname, '..', 'totemDeCafeteria', 'data', 'products.json'),
+    path.join(__dirname, '..', '..', 'totemDeCafeteria', 'data', 'products.json'),
+    path.join(__dirname, 'totemDeCafeteria.V2', 'totemDeCafeteria', 'data', 'products.json'),
+    path.join(__dirname, '..', 'totemDeCafeteria.V2', 'totemDeCafeteria', 'data', 'products.json')
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) {
+        const st = fs.statSync(c);
+        if (st.size && st.size > 200) return c;
+      }
+    } catch (e) { /* ignore */ }
+  }
+  return null;
+}
+
+try {
+  const currentStat = fs.existsSync(PRODUCTS_FILE) ? fs.statSync(PRODUCTS_FILE) : null;
+  const currentSize = currentStat ? currentStat.size : 0;
+  if (currentSize < 200) {
+    const src = findSourceProductsFile();
+    if (src) {
+      console.log('[INIT] products.json parece pequeño (', currentSize, 'bytes). Copiando desde', src);
+      try {
+        const content = fs.readFileSync(src);
+        fs.writeFileSync(PRODUCTS_FILE, content);
+        console.log('[INIT] Copia completada a', PRODUCTS_FILE);
+      } catch (e) {
+        console.warn('[INIT] No se pudo copiar products.json desde', src, e.message);
+      }
+    } else {
+      console.log('[INIT] No se encontró products.json fuente más grande en candidatos');
+    }
+  }
+} catch (e) {
+  console.warn('[INIT] Error comprobando products.json:', e.message);
+}
+
 function leerProducts() {
   try {
     const raw = fs.readFileSync(PRODUCTS_FILE);
