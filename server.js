@@ -4,6 +4,9 @@ const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 require('dotenv').config(); // 👈 carga las variables del .env
+// Centralizar la inicialización del pool de Postgres en lib/db.js
+const db = require('./lib/db');
+let pgPool = db.getPool();
 let stripe = null;
 try {
   if (process.env.STRIPE_SECRET_KEY) {
@@ -25,6 +28,12 @@ try {
 }
 
 const app = express();
+// Inicializar Pool de Postgres si 'pg' fue cargado y existe DATABASE_URL
+if (pgPool) {
+  app.locals.db = pgPool;
+} else {
+  console.log('Postgres no inicializado (pg ausente o DATABASE_URL no definida) — usando JSON local.');
+}
 app.use(cors());
 app.use(bodyParser.json({
   verify: (req, res, buf) => {
@@ -183,10 +192,35 @@ function guardarProducts(data) {
 
 // Listar productos o filtrar por categoría
 app.get('/api/products', (req, res) => {
+  const pool = app.locals.db;
+  const categoria = req.query.categoria;
+  if (pool) {
+    const sql = categoria ? 'SELECT * FROM products WHERE category = $1 ORDER BY id' : 'SELECT * FROM products ORDER BY id';
+    const params = categoria ? [categoria] : [];
+    return pool.query(sql, params)
+      .then(r => {
+        const rows = r.rows.map(row => ({
+          id: row.id,
+          nombre: row.name || null,
+          categoria: row.category || null,
+          precio: typeof row.price !== 'undefined' ? Number(row.price) : null,
+          disponible: typeof row.available !== 'undefined' ? row.available : true,
+          variantes: row.metadata && row.metadata.variantes ? row.metadata.variantes : null,
+          img: row.image || null,
+          description: row.description || null
+        }));
+        res.json(rows);
+      })
+      .catch(err => {
+        console.error('[API] Error consultando products en DB:', err);
+        res.status(500).json({ error: 'Error consultando products en DB', detail: err.message });
+      });
+  }
+
+  // Fallback a JSON local
   try {
-    console.log('[API] GET /api/products -> PRODUCTS_FILE=', PRODUCTS_FILE, 'exists=', fs.existsSync(PRODUCTS_FILE));
+    console.log('[API] GET /api/products -> using local JSON PRODUCTS_FILE=', PRODUCTS_FILE, 'exists=', fs.existsSync(PRODUCTS_FILE));
     const data = leerProducts();
-    const categoria = req.query.categoria;
     if (categoria) {
       return res.json(data.products.filter(p => p.categoria === categoria));
     }
@@ -235,6 +269,26 @@ app.post('/api/products', (req, res) => {
   if (!body || !body.nombre || !body.categoria || typeof body.precio === 'undefined') {
     return res.status(400).json({ error: 'Producto inválido. Requiere nombre, categoria y precio.' });
   }
+  const pool = app.locals.db;
+  if (pool) {
+    // Insertar en DB
+    const sql = `INSERT INTO products (name, category, price, image, available, metadata, description)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`;
+    const metadata = body.variantes ? { variantes: body.variantes } : null;
+    const params = [body.nombre, body.categoria, body.precio, body.img || null, typeof body.disponible !== 'undefined' ? body.disponible : true, metadata, body.description || null];
+    return pool.query(sql, params)
+      .then(r => {
+        const row = r.rows[0];
+        const producto = { id: row.id, nombre: row.name, categoria: row.category, precio: Number(row.price), disponible: row.available, variantes: row.metadata && row.metadata.variantes ? row.metadata.variantes : null, img: row.image };
+        res.json({ status: 'ok', product: producto });
+      })
+      .catch(err => {
+        console.error('[API] Error insertando product en DB:', err);
+        res.status(500).json({ error: 'Error insertando product en DB', detail: err.message });
+      });
+  }
+
+  // Fallback a JSON
   const data = leerProducts();
   const id = data.nextId || 1;
   data.nextId = id + 1;
@@ -247,6 +301,34 @@ app.post('/api/products', (req, res) => {
 // Actualizar producto (poner disponible, cambiar precio/variantes, etc.)
 app.put('/api/products/:id', (req, res) => {
   const id = Number(req.params.id);
+  const pool = app.locals.db;
+  if (pool) {
+    const fields = [];
+    const params = [];
+    let i = 1;
+    if (req.body.nombre) { fields.push(`name = $${i++}`); params.push(req.body.nombre); }
+    if (req.body.categoria) { fields.push(`category = $${i++}`); params.push(req.body.categoria); }
+    if (typeof req.body.precio !== 'undefined') { fields.push(`price = $${i++}`); params.push(req.body.precio); }
+    if (typeof req.body.disponible !== 'undefined') { fields.push(`available = $${i++}`); params.push(req.body.disponible); }
+    if (req.body.img) { fields.push(`image = $${i++}`); params.push(req.body.img); }
+    if (req.body.description) { fields.push(`description = $${i++}`); params.push(req.body.description); }
+    if (req.body.variantes) { fields.push(`metadata = jsonb_set(COALESCE(metadata,'{}'), '{variantes}', $${i++}::jsonb)`); params.push(JSON.stringify(req.body.variantes)); }
+    if (fields.length === 0) return res.status(400).json({ error: 'Nada que actualizar' });
+    const sql = `UPDATE products SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`;
+    params.push(id);
+    return pool.query(sql, params)
+      .then(r => {
+        if (!r.rows.length) return res.status(404).json({ error: 'Producto no encontrado' });
+        const row = r.rows[0];
+        const producto = { id: row.id, nombre: row.name, categoria: row.category, precio: Number(row.price), disponible: row.available, variantes: row.metadata && row.metadata.variantes ? row.metadata.variantes : null, img: row.image };
+        res.json({ status: 'ok', product: producto });
+      })
+      .catch(err => {
+        console.error('[API] Error actualizando product en DB:', err);
+        res.status(500).json({ error: 'Error actualizando product en DB', detail: err.message });
+      });
+  }
+
   const data = leerProducts();
   const idx = data.products.findIndex(p => p.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Producto no encontrado' });
@@ -258,6 +340,21 @@ app.put('/api/products/:id', (req, res) => {
 // Eliminar producto
 app.delete('/api/products/:id', (req, res) => {
   const id = Number(req.params.id);
+  const pool = app.locals.db;
+  if (pool) {
+    return pool.query('DELETE FROM products WHERE id = $1 RETURNING *', [id])
+      .then(r => {
+        if (!r.rows.length) return res.status(404).json({ error: 'Producto no encontrado' });
+        const row = r.rows[0];
+        const removed = { id: row.id, nombre: row.name };
+        res.json({ status: 'ok', removed });
+      })
+      .catch(err => {
+        console.error('[API] Error eliminando product en DB:', err);
+        res.status(500).json({ error: 'Error eliminando product en DB', detail: err.message });
+      });
+  }
+
   const data = leerProducts();
   const idx = data.products.findIndex(p => p.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Producto no encontrado' });
@@ -307,28 +404,61 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'inicioSesion.html'));
 });
 
-app.post('/api/pedidos', (req, res) => {
+// Crear pedido
+app.post('/api/pedidos', async (req, res) => {
   const body = req.body;
   console.log('\n[API] POST /api/pedidos recibida. Body:', JSON.stringify(body));
   if (!body || !body.cliente || !Array.isArray(body.items) || body.items.length === 0) {
     return res.status(400).json({ error: 'Formato de pedido inválido. Requiere cliente e items.' });
   }
-  const pedidos = leerPedidos();
-  const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
+
   const total = body.items.reduce((s, it) => s + (Number(it.precio || 0) * Number(it.cantidad || 1)), 0);
-  // soportar metodoPago (efectivo, junaeb, tarjeta), nota y email
-  // Si viene paymentIntentId significa que se autorizó una tarjeta de garantía (capture_method: manual)
   let estado = 'pendiente';
   if (body.metodoPago && (body.metodoPago === 'efectivo' || body.metodoPago === 'junaeb')) {
-    if (body.paymentIntentId) {
-      estado = 'Garantizado - Pendiente de Retiro';
-    } else {
-      estado = 'pendiente_pago';
-    }
+    if (body.paymentIntentId) estado = 'Garantizado - Pendiente de Retiro'; else estado = 'pendiente_pago';
   } else if (body.metodoPago && body.metodoPago === 'tarjeta') {
     estado = 'pendiente';
   }
 
+  const pool = app.locals.db;
+  if (pool) {
+    try {
+      const metadata = {
+        email: body.email || null,
+        metodoPago: body.metodoPago || null,
+        nota: body.nota || null,
+        paymentIntentId: body.paymentIntentId || null,
+        sessionId: body.sessionId || null
+      };
+      const sql = `INSERT INTO orders (external_id, items, total, status, customer_name, metadata)
+                   VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
+      const params = [body.sessionId || null, JSON.stringify(body.items), total, estado, body.cliente, metadata];
+      const r = await pool.query(sql, params);
+      const row = r.rows[0];
+      const pedido = {
+        id: row.id,
+        cliente: row.customer_name,
+        email: row.metadata && row.metadata.email ? row.metadata.email : (body.email || ''),
+        items: row.items,
+        total: Number(row.total),
+        metodoPago: row.metadata && row.metadata.metodoPago ? row.metadata.metodoPago : (body.metodoPago || 'tarjeta'),
+        nota: row.metadata && row.metadata.nota ? row.metadata.nota : (body.nota || ''),
+        estado: row.status,
+        paymentIntentId: row.metadata && row.metadata.paymentIntentId ? row.metadata.paymentIntentId : (body.paymentIntentId || null),
+        sessionId: row.external_id || null,
+        fecha: row.created_at
+      };
+      console.log(`[API] Pedido creado en DB id=${pedido.id} estado=${pedido.estado}`);
+      return res.json({ status: 'ok', pedido });
+    } catch (err) {
+      console.error('[API] Error insertando pedido en DB:', err);
+      return res.status(500).json({ error: 'Error insertando pedido en DB', detail: err.message });
+    }
+  }
+
+  // Fallback a JSON file
+  const pedidos = leerPedidos();
+  const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
   const pedido = {
     id,
     cliente: body.cliente,
@@ -343,7 +473,7 @@ app.post('/api/pedidos', (req, res) => {
   };
   pedidos.push(pedido);
   guardarPedidos(pedidos);
-  console.log(`[API] Pedido creado id=${pedido.id} estado=${pedido.estado} paymentIntentId=${pedido.paymentIntentId || ''}`);
+  console.log(`[API] Pedido creado id=${pedido.id} estado=${pedido.estado} (fallback JSON)`);
   res.json({ status: 'ok', pedido });
 });
 
@@ -370,32 +500,6 @@ app.post('/api/create-payment-intent', async (req, res) => {
     res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
   } catch (err) {
     console.error('create-payment-intent error', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Endpoint pensado para apps móviles: crea un PaymentIntent con payment methods automáticos
-// No sobreescribe el endpoint /api/create-payment-intent (que usa capture_method: 'manual').
-// Uso recomendado desde la app móvil: POST /mobile/create-payment-intent { amount, currency, metadata }
-app.post('/mobile/create-payment-intent', async (req, res) => {
-  try {
-    if (!stripe) return res.status(500).json({ error: 'Stripe no configurado en este entorno' });
-    const { amount, currency = 'CLP', metadata } = req.body;
-    console.log('[API] /mobile/create-payment-intent body=', JSON.stringify(req.body));
-    if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Amount inválido' });
-
-    // Crear PaymentIntent con métodos automáticos (Stripe decide los payment methods compatibles)
-    const pi = await stripe.paymentIntents.create({
-      amount: Math.round(Number(amount)),
-      currency: (currency || 'clp').toLowerCase(),
-      automatic_payment_methods: { enabled: true },
-      metadata: metadata || {}
-    });
-
-    console.log('[API] Mobile PaymentIntent creado:', pi.id, 'amount=', pi.amount, 'currency=', pi.currency);
-    res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
-  } catch (err) {
-    console.error('mobile create-payment-intent error', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -438,10 +542,41 @@ app.post('/api/cancel-payment-intent', async (req, res) => {
   }
 });
 
-// Endpoint para listar pedidos (código sin cambios)
-app.get('/api/pedidos', (req, res) => {
-  const pedidos = leerPedidos();
+// Endpoint para listar pedidos
+app.get('/api/pedidos', async (req, res) => {
+  const pool = app.locals.db;
   console.log('[API] GET /api/pedidos query:', req.query);
+  if (pool) {
+    try {
+      const clauses = [];
+      const params = [];
+      let i = 1;
+      if (req.query.estado) { clauses.push(`status = $${i++}`); params.push(req.query.estado); }
+      if (req.query.sessionId) { clauses.push(`(external_id = $${i} OR (metadata->> 'sessionId') = $${i})`); params.push(req.query.sessionId); i++; }
+      const sql = `SELECT * FROM orders ${clauses.length ? 'WHERE ' + clauses.join(' AND ') : ''} ORDER BY created_at DESC`;
+      const r = await pool.query(sql, params);
+      const rows = r.rows.map(row => ({
+        id: row.id,
+        cliente: row.customer_name,
+        email: row.metadata && row.metadata.email ? row.metadata.email : null,
+        items: row.items,
+        total: Number(row.total),
+        metodoPago: row.metadata && row.metadata.metodoPago ? row.metadata.metodoPago : null,
+        nota: row.metadata && row.metadata.nota ? row.metadata.nota : null,
+        estado: row.status,
+        paymentIntentId: row.metadata && row.metadata.paymentIntentId ? row.metadata.paymentIntentId : null,
+        sessionId: row.external_id || (row.metadata && row.metadata.sessionId ? row.metadata.sessionId : null),
+        fecha: row.created_at
+      }));
+      return res.json(rows);
+    } catch (err) {
+      console.error('[API] Error consultando pedidos en DB:', err);
+      return res.status(500).json({ error: 'Error consultando pedidos en DB', detail: err.message });
+    }
+  }
+
+  // fallback a JSON
+  const pedidos = leerPedidos();
   if (req.query.estado) {
     const filtered = pedidos.filter(p => p.estado === req.query.estado);
     console.log('[API] returning', filtered.length, 'pedidos for estado=', req.query.estado);
@@ -456,9 +591,35 @@ app.get('/api/pedidos', (req, res) => {
   res.json(pedidos);
 });
 
-// Obtener pedido por id (código sin cambios)
-app.get('/api/pedidos/:id', (req, res) => {
+// Obtener pedido por id
+app.get('/api/pedidos/:id', async (req, res) => {
   const id = Number(req.params.id);
+  const pool = app.locals.db;
+  if (pool) {
+    try {
+      const r = await pool.query('SELECT * FROM orders WHERE id = $1', [id]);
+      if (!r.rows.length) return res.status(404).json({ error: 'Pedido no encontrado' });
+      const row = r.rows[0];
+      const pedido = {
+        id: row.id,
+        cliente: row.customer_name,
+        email: row.metadata && row.metadata.email ? row.metadata.email : null,
+        items: row.items,
+        total: Number(row.total),
+        metodoPago: row.metadata && row.metadata.metodoPago ? row.metadata.metodoPago : null,
+        nota: row.metadata && row.metadata.nota ? row.metadata.nota : null,
+        estado: row.status,
+        paymentIntentId: row.metadata && row.metadata.paymentIntentId ? row.metadata.paymentIntentId : null,
+        sessionId: row.external_id || (row.metadata && row.metadata.sessionId ? row.metadata.sessionId : null),
+        fecha: row.created_at
+      };
+      return res.json(pedido);
+    } catch (err) {
+      console.error('[API] Error consultando pedido por id en DB:', err);
+      return res.status(500).json({ error: 'Error consultando pedido en DB', detail: err.message });
+    }
+  }
+
   const pedidos = leerPedidos();
   const pedido = pedidos.find(p => p.id === id);
   console.log('[API] GET /api/pedidos/' + id + ' found=', Boolean(pedido));
