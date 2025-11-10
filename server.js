@@ -28,6 +28,8 @@ try {
 }
 
 const app = express();
+// Forzar uso exclusivo de la base de datos si se define esta variable de entorno
+const USE_DB_ONLY = process.env.USE_DB_ONLY === 'true' || process.env.FORCE_DB === 'true';
 // Inicializar Pool de Postgres si 'pg' fue cargado y existe DATABASE_URL
 if (pgPool) {
   app.locals.db = pgPool;
@@ -44,6 +46,14 @@ app.use(bodyParser.json({
   }
 }));
 app.use(express.static(path.join(__dirname)));
+
+// Si se exige DB-only, bloquear las rutas /api si no hay pool configurado
+if (USE_DB_ONLY) {
+  app.use('/api', (req, res, next) => {
+    if (!app.locals.db) return res.status(503).json({ error: 'Database required but not configured. Set DATABASE_URL or unset USE_DB_ONLY.' });
+    next();
+  });
+}
 
 // Determinar dinámicamente DATA_DIR: preferimos una carpeta `data` con products.json completo
 function chooseDataDir() {
@@ -260,6 +270,20 @@ app.get('/api/health', (req, res) => {
   } catch (err) {
     console.error('Error en /api/health', err);
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Endpoint simple para comprobar si la conexión a Postgres está activa
+app.get('/api/dbtest', async (req, res) => {
+  const pool = app.locals.db;
+  if (!pool) return res.json({ ok: true, db: false, message: 'DB no inicializada (fallback JSON activo)' });
+  try {
+    const r = await pool.query('SELECT 1 AS ok');
+    if (r && r.rows && r.rows.length) return res.json({ ok: true, db: true });
+    return res.json({ ok: true, db: false });
+  } catch (err) {
+    console.error('Error en /api/dbtest:', err.message || err);
+    return res.status(500).json({ ok: false, db: false, error: err.message });
   }
 });
 

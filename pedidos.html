@@ -10,7 +10,7 @@
 
   <title>Pedidos - Cafetería</title>
 
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/styles.css">
 
 </head>
 
@@ -97,6 +97,8 @@
     setInterval(cargar, 3000);
 
     cargar();
+  // comprobar DB y mostrar en consola
+  (async ()=>{ try{ const r = await fetch('/api/dbtest'); const j = await r.json(); console.info('DB activa:', j.db); }catch(e){ console.warn('No se pudo comprobar DB', e); } })();
 
   </script>
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin - Productos</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     /* Estilos pequeños para el panel admin */
@@ -47,6 +47,7 @@
   </header>
 
   <main class="admin-container">
+    <div id="dbStatus" style="position:fixed;right:12px;top:12px;padding:6px 10px;border-radius:6px;background:#eee;color:#222;font-size:.9rem;z-index:999;">DB: comprobando...</div>
     <!-- Sección para agregar productos -->
     <section id="controls" class="admin-section">
       <div class="section-header">
@@ -90,7 +91,19 @@
         });
       }
       load();
+      checkDbStatus();
     });
+
+    async function checkDbStatus(){
+      try{
+        const res = await fetch('/api/dbtest');
+        const j = await res.json();
+        const el = document.getElementById('dbStatus');
+        if (!el) return;
+        if (j && j.db) { el.textContent = 'DB: Conectada'; el.style.background = '#dff2e4'; el.style.color = '#0a6c2c'; }
+        else { el.textContent = 'DB: No conectada (fallback JSON)'; el.style.background = '#fdecea'; el.style.color = '#8a1f1f'; }
+      }catch(e){ console.warn('No se pudo comprobar DB', e); }
+    }
 
     async function fetchProducts() {
       const res = await fetch('/api/products');
