@@ -27,6 +27,13 @@ try {
   nodemailer = null;
 }
 
+let bcrypt = null;
+try {
+  bcrypt = require('bcrypt');
+} catch (e) {
+  console.warn('bcrypt no está instalado — la comparación de contraseñas seguras no estará disponible.');
+}
+
 const session = require('express-session');
 const app = express();
 // Forzar uso exclusivo de la base de datos si se define esta variable de entorno
@@ -420,16 +427,19 @@ let mailTransport = null;
       return;
     }
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      mailTransport = nodemailer.createTransport({
+      const transportOptions = {
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: Number(process.env.SMTP_PORT) || 465,
         secure: process.env.SMTP_SECURE !== 'false', // Default to true unless explicitly set to 'false'
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS
-        }
-      });
-      console.log('SMTP transport configured.');
+        },
+        connectionTimeout: 15000, // 15 segundos
+        greetingTimeout: 10000 // 10 segundos
+      };
+      mailTransport = nodemailer.createTransport(transportOptions);
+      console.log('SMTP transport configured with host:', transportOptions.host, 'port:', transportOptions.port, 'secure:', transportOptions.secure);
     } else {
       console.log('SMTP credentials not found — creating Ethereal test account for email preview.');
       const testAccount = await nodemailer.createTestAccount();
@@ -482,38 +492,43 @@ app.post('/api/admin/login', async (req, res) => {
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
             req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email, userId: user.id };
             
-            try {
-              if (mailTransport) {
-                const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-                await mailTransport.sendMail(mailOptions);
-              } else {
-                console.warn(`[mail] mailTransport no configurado: code for ${email} is ${verificationCode}`);
-              }
-            } catch (e) {
-              console.error('[mail] Error sending verification code:', e.message || e);
+            // Send email without blocking the response
+            if (mailTransport) {
+              const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
+              mailTransport.sendMail(mailOptions)
+                .then(info => console.log(`[mail] Verification code sent to ${user.email}. Message ID: ${info.messageId}`))
+                .catch(err => console.error(`[mail] Failed to send verification code to ${user.email}:`, err.message || err));
+            } else {
+              console.warn(`[mail] mailTransport no configurado: code for ${email} is ${verificationCode}`);
             }
             
             return res.json({ status: 'ok', message: 'Código de verificación enviado' });
+          } else {
+            // IMPORTANT: If user exists in DB but password is wrong, fail immediately.
+            return res.status(401).json({ error: 'Credenciales inválidas' });
           }
         }
+        // If user is not found in the DB, proceed to fallback...
       } catch (e) {
         console.error('[admin] DB error during login:', e.message);
         return res.status(500).json({ error: 'Error de base de datos durante el login' });
       }
     }
 
-    // --- Fallback Authentication (if DB not configured or user not found/invalid password) ---
+    // --- Fallback Authentication (if DB not configured or user not found in DB) ---
     if (email === 'admin@gmail.com' && password === '1234') {
       const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email };
-      try {
-        if (mailTransport) {
-          const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: process.env.SMTP_USER || 'ssalasg@alumnos.ceduc.cl', subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-          await mailTransport.sendMail(mailOptions);
-        } else {
-          console.log(`[admin] Verification code (dev fallback): ${verificationCode}`);
-        }
-      } catch (e) { console.error('[mail] error enviando mail fallback:', e); }
+      
+      // Send email without blocking the response
+      if (mailTransport) {
+        const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: process.env.SMTP_USER || 'ssalasg@alumnos.ceduc.cl', subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
+        mailTransport.sendMail(mailOptions)
+          .then(info => console.log(`[mail] Fallback verification code sent. Message ID: ${info.messageId}`))
+          .catch(err => console.error('[mail] error enviando mail fallback:', err.message || err));
+      } else {
+        console.log(`[admin] Verification code (dev fallback): ${verificationCode}`);
+      }
       return res.json({ status: 'ok', message: 'Código de verificación enviado' });
     }
 
