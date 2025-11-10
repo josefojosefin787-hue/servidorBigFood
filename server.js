@@ -34,6 +34,25 @@ try {
   console.warn('bcrypt no está instalado — la comparación de contraseñas seguras no estará disponible.');
 }
 
+let OAuth2Client = null;
+let googleClient = null;
+try {
+  ({ OAuth2Client } = require('google-auth-library'));
+  if (process.env.GOOGLE_CLIENT_ID) {
+    googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+} catch (e) {
+  console.warn('google-auth-library no está instalada — Google Sign-In estará deshabilitado.');
+}
+
+function getGoogleClient() {
+  if (!OAuth2Client) return null;
+  if (!googleClient && process.env.GOOGLE_CLIENT_ID) {
+    googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+  return googleClient;
+}
+
 const session = require('express-session');
 const app = express();
 // Forzar uso exclusivo de la base de datos si se define esta variable de entorno
@@ -63,13 +82,28 @@ app.use(session({
 }));
 
 // Protección simple para la ruta /admin.html: redirige a login si no autenticado
+const ADMIN_PUBLIC_API = new Set(['/api/admin/login', '/api/admin/logout', '/api/admin/session']);
+
 app.use((req, res, next) => {
   try {
     const pathReq = req.path || req.originalUrl || '/';
-    if (pathReq === '/admin.html' || pathReq.startsWith('/admin') || pathReq.startsWith('/api/admin')) {
-      // permitir acceso a endpoints de login/verify/logout sin auth
-      if (pathReq.startsWith('/api/admin') || pathReq === '/admin-login.html' || pathReq === '/verify.html') return next();
-      if (!req.session || !req.session.isAuthenticated) return res.redirect('/admin-login.html');
+
+    if (pathReq === '/admin-login.html') {
+      return next();
+    }
+
+    if (pathReq.startsWith('/api/admin')) {
+      if (!req.session || !req.session.isAuthenticated) {
+        if (ADMIN_PUBLIC_API.has(pathReq)) return next();
+        return res.status(401).json({ error: 'No autenticado' });
+      }
+      return next();
+    }
+
+    if (pathReq === '/admin.html' || (pathReq.startsWith('/admin') && pathReq !== '/admin-login.html')) {
+      if (!req.session || !req.session.isAuthenticated) {
+        return res.redirect('/admin-login.html');
+      }
     }
   } catch (e) { /* ignore */ }
   next();
@@ -427,19 +461,32 @@ let mailTransport = null;
       return;
     }
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      // Configuración de transporte de Nodemailer mejorada
       const transportOptions = {
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        host: process.env.SMTP_HOST,
         port: Number(process.env.SMTP_PORT) || 465,
-        secure: process.env.SMTP_SECURE !== 'false', // Default to true unless explicitly set to 'false'
+        secure: process.env.SMTP_SECURE !== 'false',
         auth: {
           user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
+          pass: process.env.SMTP_PASS,
         },
-        connectionTimeout: 15000, // 15 segundos
-        greetingTimeout: 10000 // 10 segundos
+        // Tiempos de espera más cortos para evitar bloqueos largos
+        connectionTimeout: 8000, // 8 segundos
+        greetingTimeout: 5000, // 5 segundos
+        socketTimeout: 10000, // 10 segundos
       };
+
+      // Si se usa Gmail, es mejor especificar el 'service'
+      if (transportOptions.host === 'smtp.gmail.com') {
+        transportOptions.service = 'gmail';
+      }
+
       mailTransport = nodemailer.createTransport(transportOptions);
-      console.log('SMTP transport configured with host:', transportOptions.host, 'port:', transportOptions.port, 'secure:', transportOptions.secure);
+      
+      console.log('Verificando configuración de SMTP...');
+      await mailTransport.verify();
+      console.log('SMTP transport configurado y verificado correctamente. Host:', transportOptions.host);
+
     } else {
       console.log('SMTP credentials not found — creating Ethereal test account for email preview.');
       const testAccount = await nodemailer.createTestAccount();
@@ -457,108 +504,104 @@ let mailTransport = null;
   }
 })();
 
-// Rutas de administración: login con verificación por código (2FA) usando sesiones
+app.get('/api/auth/config', (req, res) => {
+  res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || null });
+});
+
+// Rutas de administración: login con Google Sign-In y sesiones
 app.post('/api/admin/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y password son requeridos' });
+    const { credential } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ error: 'Token de Google requerido' });
     }
+
+    const client = getGoogleClient();
+    if (!client || !process.env.GOOGLE_CLIENT_ID) {
+      console.error('[admin] Google Sign-In no está configurado correctamente.');
+      return res.status(500).json({ error: 'Autenticación con Google no está configurada' });
+    }
+
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      console.error('[admin] Error verificando token de Google:', err.message || err);
+      return res.status(401).json({ error: 'Token de Google inválido' });
+    }
+
+    const email = payload && payload.email ? String(payload.email).toLowerCase() : null;
+    if (!email) {
+      return res.status(401).json({ error: 'Token de Google inválido' });
+    }
+
     const pool = app.locals.db;
-
-    // --- Database Authentication ---
-    if (pool) {
-      try {
-        const q = await pool.query('SELECT * FROM usuarios WHERE email = $1 LIMIT 1', [email]);
-        let user = q.rows && q.rows.length ? q.rows[0] : null;
-
-        if (!user) {
-          const q2 = await pool.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]).catch(() => ({ rows: [] }));
-          user = q2.rows && q2.rows.length ? q2.rows[0] : null;
-        }
-
-        if (user) {
-          // User found, validate password
-          let valid = false;
-          try {
-            const bcrypt = require('bcrypt');
-            if (user.password) valid = await bcrypt.compare(password, user.password);
-          } catch (e) {
-            valid = (String(user.password || '') === String(password));
-          }
-
-          if (valid) {
-            // Password is valid for DB user
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email, userId: user.id };
-            
-            // Send email without blocking the response
-            if (mailTransport) {
-              const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-              mailTransport.sendMail(mailOptions)
-                .then(info => console.log(`[mail] Verification code sent to ${user.email}. Message ID: ${info.messageId}`))
-                .catch(err => console.error(`[mail] Failed to send verification code to ${user.email}:`, err.message || err));
-            } else {
-              console.warn(`[mail] mailTransport no configurado: code for ${email} is ${verificationCode}`);
-            }
-            
-            return res.json({ status: 'ok', message: 'Código de verificación enviado' });
-          } else {
-            // IMPORTANT: If user exists in DB but password is wrong, fail immediately.
-            return res.status(401).json({ error: 'Credenciales inválidas' });
-          }
-        }
-        // If user is not found in the DB, proceed to fallback...
-      } catch (e) {
-        console.error('[admin] DB error during login:', e.message);
-        return res.status(500).json({ error: 'Error de base de datos durante el login' });
-      }
+    if (!pool) {
+      console.error('[admin] Intento de login sin base de datos configurada.');
+      return res.status(503).json({ error: 'Servicio de autenticación no disponible (DB no configurada)' });
     }
 
-    // --- Fallback Authentication (if DB not configured or user not found in DB) ---
-    if (email === 'admin@gmail.com' && password === '1234') {
-      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email };
-      
-      // Send email without blocking the response
-      if (mailTransport) {
-        const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: process.env.SMTP_USER || 'ssalasg@alumnos.ceduc.cl', subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-        mailTransport.sendMail(mailOptions)
-          .then(info => console.log(`[mail] Fallback verification code sent. Message ID: ${info.messageId}`))
-          .catch(err => console.error('[mail] error enviando mail fallback:', err.message || err));
+    let user = null;
+    try {
+      const primary = await pool.query('SELECT id, email, nombre FROM usuarios WHERE email = $1 LIMIT 1', [email]);
+      if (primary.rows && primary.rows.length) {
+        user = primary.rows[0];
       } else {
-        console.log(`[admin] Verification code (dev fallback): ${verificationCode}`);
+        const fallback = await pool.query('SELECT id, email FROM users WHERE email = $1 LIMIT 1', [email]).catch(() => ({ rows: [] }));
+        if (fallback.rows && fallback.rows.length) {
+          user = fallback.rows[0];
+        }
       }
-      return res.json({ status: 'ok', message: 'Código de verificación enviado' });
+    } catch (dbErr) {
+      console.error('[admin] Error de DB al validar usuario Google:', dbErr.message || dbErr);
+      return res.status(500).json({ error: 'Error de base de datos durante la verificación' });
     }
 
-    // --- All checks failed ---
-    return res.status(401).json({ error: 'Credenciales inválidas' });
+    if (!user) {
+      return res.status(401).json({ error: 'La cuenta asociada a Google no está registrada en nuestra base de datos.' });
+    }
 
+    const sessionAdmin = {
+      id: user.id || null,
+      email,
+      name: payload && payload.name ? payload.name : null,
+      picture: payload && payload.picture ? payload.picture : null
+    };
+
+    await new Promise((resolve, reject) => {
+      req.session.regenerate(err => {
+        if (err) return reject(err);
+        req.session.isAuthenticated = true;
+        req.session.admin = sessionAdmin;
+        resolve();
+      });
+    });
+
+    return res.json({ status: 'ok', admin: req.session.admin });
   } catch (err) {
-    console.error('[admin] Unexpected error during login:', err);
+    console.error('[admin] Unexpected error during Google login:', err);
     return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
-app.post('/api/admin/verify', (req, res) => {
-  const { code } = req.body || {};
-  if (!req.session || !req.session.pendingVerification) return res.status(400).json({ error: 'No hay verificación pendiente' });
-  const { code: storedCode, timestamp } = req.session.pendingVerification;
-  if (Date.now() - timestamp > 10 * 60 * 1000) { delete req.session.pendingVerification; return res.status(400).json({ error: 'El código ha expirado' }); }
-  if (String(code) === String(storedCode)) {
-    req.session.isAuthenticated = true;
-    // opcional: almacenar info del admin en sesión
-    req.session.admin = { email: req.session.pendingVerification.email, id: req.session.pendingVerification.userId || null };
-    delete req.session.pendingVerification;
-    return res.json({ status: 'ok' });
+app.get('/api/admin/session', (req, res) => {
+  if (req.session && req.session.isAuthenticated && req.session.admin) {
+    return res.json({ authenticated: true, admin: req.session.admin });
   }
-  return res.status(401).json({ error: 'Código inválido' });
+  return res.status(401).json({ authenticated: false, error: 'No autenticado' });
 });
 
 app.post('/api/admin/logout', (req, res) => {
+  if (!req.session) return res.json({ status: 'ok' });
+  const adminEmail = req.session.admin && req.session.admin.email ? req.session.admin.email : null;
   req.session.destroy(err => {
     if (err) return res.status(500).json({ error: 'Error al cerrar sesión' });
+    res.clearCookie('connect.sid');
+    if (adminEmail) console.log(`[admin] Sesión finalizada para ${adminEmail}`);
     res.json({ status: 'ok' });
   });
 });
