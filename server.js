@@ -422,8 +422,8 @@ let mailTransport = null;
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       mailTransport = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === 'true',
+        port: Number(process.env.SMTP_PORT) || 465,
+        secure: process.env.SMTP_SECURE !== 'false', // Default to true unless explicitly set to 'false'
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS
@@ -451,72 +451,82 @@ let mailTransport = null;
 app.post('/api/admin/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Email y password requeridos' });
-  const pool = app.locals.db;
+
   try {
-    // Intentar buscar usuario en DB (tabla 'usuarios' - ajustar si tu tabla tiene otro nombre)
+    const pool = app.locals.db;
+
+    // --- Database Authentication ---
     if (pool) {
       try {
         const q = await pool.query('SELECT * FROM usuarios WHERE email = $1 LIMIT 1', [email]);
         let user = q.rows && q.rows.length ? q.rows[0] : null;
+
         if (!user) {
-          // intentar otras convenciones
+          // Try 'users' table if 'usuarios' yielded no result
           const q2 = await pool.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]).catch(() => ({ rows: [] }));
           user = q2.rows && q2.rows.length ? q2.rows[0] : null;
         }
+
         if (user) {
-          // intentar verificar contraseña: si bcrypt está disponible, usarlo; si no, comparar directo (depende de cómo estén guardadas)
+          // User found in DB, now validate password
           let valid = false;
           try {
             const bcrypt = require('bcrypt');
             if (user.password) valid = await bcrypt.compare(password, user.password);
           } catch (e) {
-            // bcrypt no disponible o error -> comparar texto plano (solo fallback)
+            // Fallback to plaintext if bcrypt fails or is not available
             valid = (String(user.password || '') === String(password));
           }
-          if (!valid) return res.status(401).json({ error: 'Credenciales inválidas' });
 
-          // generar código y almacenarlo en sesión
+          if (!valid) {
+            // Password invalid for DB user, do not proceed to fallback
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+          }
+
+          // --- Password is valid for DB user ---
           const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
           req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email, userId: user.id };
-          // enviar correo
+          
           try {
             if (mailTransport) {
-              const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || process.env.GOOGLE_USER_EMAIL || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-              const info = await mailTransport.sendMail(mailOptions);
-              if (mailTransport.options && mailTransport.options.jsonTransport) console.log('[mail] dev mail:', info.message);
+              const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
+              await mailTransport.sendMail(mailOptions);
             } else {
-              console.warn('[mail] mailTransport no configurado: el código sería', verificationCode);
+              console.warn(`[mail] mailTransport no configurado: code for ${email} is ${verificationCode}`);
             }
           } catch (e) {
-            console.error('[mail] Error enviando código admin:', e.message || e);
+            console.error('[mail] Error sending verification code:', e.message || e);
           }
+          
           return res.json({ status: 'ok', message: 'Código de verificación enviado' });
         }
       } catch (e) {
-        console.warn('[admin] error consultando usuario en DB:', e && e.message ? e.message : e);
+        console.warn('[admin] DB error during login, proceeding to fallback:', e.message);
       }
     }
 
-    // Fallback simple (modo desarrollo) - credenciales estáticas como en el adjunto
+    // --- Fallback Authentication ---
+    // This runs if DB is not available, or if the user was not found in the DB.
     if (email === 'admin@gmail.com' && password === '1234') {
       const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email };
       try {
         if (mailTransport) {
           const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: process.env.SMTP_USER || 'ssalasg@alumnos.ceduc.cl', subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-          const info = await mailTransport.sendMail(mailOptions);
-          if (mailTransport.options && mailTransport.options.jsonTransport) console.log('[mail] dev mail:', info.message);
+          await mailTransport.sendMail(mailOptions);
         } else {
-          console.log('[admin] Código de verificación (dev):', verificationCode);
+          console.log(`[admin] Verification code (dev fallback): ${verificationCode}`);
         }
       } catch (e) { console.error('[mail] error enviando mail fallback:', e); }
       return res.json({ status: 'ok', message: 'Código de verificación enviado' });
     }
 
+    // --- All checks failed ---
     return res.status(401).json({ error: 'Credenciales inválidas' });
+
   } catch (err) {
-    console.error('[admin] error login:', err);
-    return res.status(500).json({ error: 'Error interno' });
+    console.error('[admin] Unexpected error during login:', err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
@@ -859,7 +869,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         price_data: {
           currency: 'clp',
           product_data: { name: item.nombre },
-          unit_amount: item.precio, // CLP usa montos enteros
+          unit_amount: Math.round(item.precio), // CLP usa montos enteros. Se redondea para asegurar que sea un entero.
         },
         quantity: item.cantidad,
       })),
