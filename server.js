@@ -449,10 +449,11 @@ let mailTransport = null;
 
 // Rutas de administración: login con verificación por código (2FA) usando sesiones
 app.post('/api/admin/login', async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email y password requeridos' });
-
   try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email y password son requeridos' });
+    }
     const pool = app.locals.db;
 
     // --- Database Authentication ---
@@ -462,51 +463,46 @@ app.post('/api/admin/login', async (req, res) => {
         let user = q.rows && q.rows.length ? q.rows[0] : null;
 
         if (!user) {
-          // Try 'users' table if 'usuarios' yielded no result
           const q2 = await pool.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]).catch(() => ({ rows: [] }));
           user = q2.rows && q2.rows.length ? q2.rows[0] : null;
         }
 
         if (user) {
-          // User found in DB, now validate password
+          // User found, validate password
           let valid = false;
           try {
             const bcrypt = require('bcrypt');
             if (user.password) valid = await bcrypt.compare(password, user.password);
           } catch (e) {
-            // Fallback to plaintext if bcrypt fails or is not available
             valid = (String(user.password || '') === String(password));
           }
 
-          if (!valid) {
-            // Password invalid for DB user, do not proceed to fallback
-            return res.status(401).json({ error: 'Credenciales inválidas' });
-          }
-
-          // --- Password is valid for DB user ---
-          const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-          req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email, userId: user.id };
-          
-          try {
-            if (mailTransport) {
-              const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
-              await mailTransport.sendMail(mailOptions);
-            } else {
-              console.warn(`[mail] mailTransport no configurado: code for ${email} is ${verificationCode}`);
+          if (valid) {
+            // Password is valid for DB user
+            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email, userId: user.id };
+            
+            try {
+              if (mailTransport) {
+                const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
+                await mailTransport.sendMail(mailOptions);
+              } else {
+                console.warn(`[mail] mailTransport no configurado: code for ${email} is ${verificationCode}`);
+              }
+            } catch (e) {
+              console.error('[mail] Error sending verification code:', e.message || e);
             }
-          } catch (e) {
-            console.error('[mail] Error sending verification code:', e.message || e);
+            
+            return res.json({ status: 'ok', message: 'Código de verificación enviado' });
           }
-          
-          return res.json({ status: 'ok', message: 'Código de verificación enviado' });
         }
       } catch (e) {
-        console.warn('[admin] DB error during login, proceeding to fallback:', e.message);
+        console.error('[admin] DB error during login:', e.message);
+        return res.status(500).json({ error: 'Error de base de datos durante el login' });
       }
     }
 
-    // --- Fallback Authentication ---
-    // This runs if DB is not available, or if the user was not found in the DB.
+    // --- Fallback Authentication (if DB not configured or user not found/invalid password) ---
     if (email === 'admin@gmail.com' && password === '1234') {
       const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
       req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email };
@@ -869,7 +865,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
         price_data: {
           currency: 'clp',
           product_data: { name: item.nombre },
-          unit_amount: Math.round(item.precio), // CLP usa montos enteros. Se redondea para asegurar que sea un entero.
+          unit_amount: Math.round(Number(item.precio)), // CLP usa montos enteros. Se redondea para asegurar que sea un entero.
         },
         quantity: item.cantidad,
       })),

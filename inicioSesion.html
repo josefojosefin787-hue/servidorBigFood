@@ -10,58 +10,282 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
+    <style>
+        .hero-section {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        .section {
+            padding: 80px 20px;
+            background: var(--bg-white);
+        }
+        
+        .about-section {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            gap: 50px;
+            align-items: center;
+        }
+        
+        .about-content {
+            flex: 1;
+        }
+        
+        .about-image {
+            width: 400px;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .section-title {
+            font-size: 2.5rem;
+            color: var(--text-primary);
+            margin-bottom: 30px;
+            position: relative;
+            padding-bottom: 15px;
+        }
+        
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: #18944c;
+            border-radius: 2px;
+        }
+        
+        .reviews-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .reviews-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+        
+        .review-card {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .review-card:hover {
+            transform: translateY(-10px);
+        }
+        
+        .stars {
+            color: #ffd700;
+            margin: 15px 0;
+        }
+        
+        .contact-section {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .contact-form {
+            display: grid;
+            gap: 20px;
+            margin-top: 40px;
+        }
+        
+        .contact-form input,
+        .contact-form select,
+        .contact-form textarea {
+            padding: 15px;
+            border: 2px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 100%;
+            background: var(--bg-white);
+            color: var(--text-primary);
+        }
+        
+        .contact-form button {
+            background: #18944c;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .contact-form button:hover {
+            background: #147a3e;
+        }
+        
+        .scroll-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: bounce 2s infinite;
+            color: var(--text-primary);
+            font-size: 2rem;
+            cursor: pointer;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-30px);
+            }
+            60% {
+                transform: translateY(-15px);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .about-section {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .about-image {
+                width: 100%;
+                max-width: 400px;
+            }
+            
+            .section-title::after {
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            
+            .reviews-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 
 <body>
-
     <div class="theme-switch-wrapper">
-      <label class="theme-switch" for="checkbox">
-        <input type="checkbox" id="checkbox" />
-        <div class="slider"></div>
-      </label>
+        <label class="theme-switch" for="checkbox">
+            <input type="checkbox" id="checkbox" />
+            <div class="slider"></div>
+        </label>
     </div>
 
-    <div class="fondo-animado">
-    <img src="/img/hamburguesa.png" class="icono comida1">
-    <img src="/img/hotdog.png" class="icono comida2">
-    <img src="/img/jugo.png" class="icono comida3">
-    <img src="/img/papas.png" class="icono comida4">
-    <img src="/img/pizza.png" class="icono comida5">
+    <div class="content-container">
+        <section class="hero-section">
+            <div class="fondo-animado">
+                <img src="/img/hamburguesa.png" class="icono comida1">
+                <img src="/img/hotdog.png" class="icono comida2">
+                <img src="/img/jugo.png" class="icono comida3">
+                <img src="/img/papas.png" class="icono comida4">
+                <img src="/img/pizza.png" class="icono comida5">
+            </div>
 
-        <img src="img/hamburguesa.png" class="icono comida1">
-        <img src="img/hotdog.png" class="icono comida2">
-        <img src="img/jugo.png" class="icono comida3">
-        <img src="img/papas.png" class="icono comida4">
-        <img src="img/pizza.png" class="icono comida5">
+            <div class="contenedor contenedor-login">
+                <div class="contenedor-titulo">
+                    <h1 class="titulo animate-title">Bienvenido a</h1>
+                    <h1 class="titulo2 logo-estilo animate-logo">BigFood</h1>
+                </div>
 
-        <img src="img/hamburguesa.png" class="icono comida1">
-        <img src="img/hotdog.png" class="icono comida2">
-        <img src="img/jugo.png" class="icono comida3">
-        <img src="img/papas.png" class="icono comida4">
-        <img src="img/pizza.png" class="icono comida5">
+                <form class="cont-formulario" action="pagina2.html" method="GET">
+                    <input type="text" class="input" id="nombre" name="nombre" placeholder="Ingresa tu Nombre / Apellido" required>
+                    <input type="submit" value="Ingresar" class="boton-enviar boton-principal" id="ingresar">
+                </form>
+            </div>
 
-        <img src="img/hamburguesa.png" class="icono comida1">
-        <img src="img/hotdog.png" class="icono comida2">
-        <img src="img/jugo.png" class="icono comida3">
-        <img src="img/papas.png" class="icono comida4">
-        <img src="img/pizza.png" class="icono comida5">
+            <div class="scroll-indicator">
+                <i class="fas fa-chevron-down"></i>
+            </div>
+        </section>
 
-        <img src="img/hamburguesa.png" class="icono comida1">
-        <img src="img/hotdog.png" class="icono comida2">
-        <img src="img/jugo.png" class="icono comida3">
-        <img src="img/papas.png" class="icono comida4">
-        <img src="img/pizza.png" class="icono comida5">
-    </div>
-    <div class="contenedor contenedor-login"> 
-        <div class="contenedor-titulo">
-            <h1 class="titulo animate-title">Bienvenido a</h1>
-            <h1 class="titulo2 logo-estilo animate-logo">Webstorant</h1>
-        </div>
+        <!-- Sección Quiénes Somos -->
+        <section class="section" id="about">
+            <div class="about-section">
+                <div class="about-content">
+                    <h2 class="section-title">Quiénes Somos</h2>
+                    <p>BigFood es una innovadora plataforma web desarrollada por estudiantes apasionados del Centro de Formación Técnica CEDUC UCN. Nuestro objetivo es revolucionar la forma en que las personas interactúan con los servicios de cafetería, haciendo el proceso más eficiente y accesible para todos.</p>
+                    <p>Como estudiantes, entendemos las necesidades específicas de nuestra comunidad educativa y hemos creado una solución que combina tecnología de punta con facilidad de uso. BigFood no es solo una aplicación; es el resultado de horas de dedicación, creatividad y compromiso con la excelencia.</p>
+                    <p>Nuestro equipo está comprometido con la mejora continua y la satisfacción del usuario, trabajando constantemente para implementar nuevas características y optimizar la experiencia de todos nuestros usuarios.</p>
+                </div>
+                <img src="/img/team-photo.jpg" alt="Equipo BigFood" class="about-image">
+            </div>
+        </section>
 
-        <form class="cont-formulario" action="pagina2.html" method="GET">
-            <input type="text" class="input" id="nombre" name="nombre" placeholder="Ingresa tu Nombre / Apellido" required>
-            <input type="submit" value="Ingresar" class="boton-enviar boton-principal" id="ingresar">
-        </form>
+        <!-- Sección de Reseñas -->
+        <section class="section" id="reviews">
+            <div class="reviews-section">
+                <h2 class="section-title">Opiniones de Nuestros Usuarios</h2>
+                <div class="reviews-grid">
+                    <div class="review-card">
+                        <h3>María González</h3>
+                        <div class="stars">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <p>"¡Excelente aplicación! Ha hecho que ordenar en la cafetería sea mucho más rápido y conveniente. Ya no tengo que hacer filas largas."</p>
+                    </div>
+                    <div class="review-card">
+                        <h3>Juan Pérez</h3>
+                        <div class="stars">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="far fa-star"></i>
+                        </div>
+                        <p>"La interfaz es muy intuitiva y fácil de usar. Me encanta poder ver el menú completo y hacer mi pedido con anticipación."</p>
+                    </div>
+                    <div class="review-card">
+                        <h3>Ana Silva</h3>
+                        <div class="stars">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star-half-alt"></i>
+                        </div>
+                        <p>"El sistema de pagos es muy seguro y la atención al cliente es excelente. Definitivamente recomiendo BigFood."</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sección de Contacto -->
+        <section class="section" id="contact">
+            <div class="contact-section">
+                <h2 class="section-title">Contáctanos</h2>
+                <p>¿Tienes alguna pregunta o has encontrado algún problema? ¡Nos encantaría escucharte!</p>
+                <form class="contact-form" id="contactForm">
+                    <input type="text" placeholder="Nombre" required>
+                    <input type="email" placeholder="Correo electrónico" required>
+                    <select>
+                        <option value="">Selecciona el tipo de consulta</option>
+                        <option value="consulta">Consulta general</option>
+                        <option value="error">Reportar un error</option>
+                        <option value="sugerencia">Sugerencia</option>
+                    </select>
+                    <textarea placeholder="Escribe tu mensaje aquí..." rows="5" required></textarea>
+                    <button type="submit">Enviar mensaje</button>
+                </form>
+            </div>
+        </section>
 
         <div class="menu-content">
             <span class="menu-item" id="menu">
@@ -77,15 +301,48 @@
                 <img src="/svg/youtube.svg" alt="Youtube">
             </a>
         </div>
-        <script>
-            const btnMenu = document.querySelector('#menu'),
-                menuContent = document.querySelector('.menu-content');
-
-            btnMenu.addEventListener('click', () => {
-                menuContent.classList.toggle('menu-active');
-            });
-        </script>
     </div>
+
+    <script>
+        const btnMenu = document.querySelector('#menu'),
+            menuContent = document.querySelector('.menu-content');
+
+        btnMenu.addEventListener('click', () => {
+            menuContent.classList.toggle('menu-active');
+        });
+
+        // Smooth scroll para el indicador de scroll y navegación
+        document.querySelector('.scroll-indicator').addEventListener('click', () => {
+            document.querySelector('#about').scrollIntoView({
+                behavior: 'smooth'
+            });
+        });
+
+        // Animación de aparición al hacer scroll
+        const sections = document.querySelectorAll('.section');
+        const observerOptions = {
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => {
+            section.style.opacity = '0';
+            section.style.transform = 'translateY(50px)';
+            section.style.transition = 'all 0.6s ease-out';
+            observer.observe(section);
+        });
+    </script>
+</body>
+
+</html>
 
     <script>
     // Control del tema oscuro
