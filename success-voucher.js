@@ -51,6 +51,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     voucherDiv.innerHTML = `
       <div class="cont-formulario" style="max-width:400px;margin:0 auto;">
         <h2 class="titulo2">Voucher de Pago</h2>
+        <p><strong>Pedido #:</strong> ${pedido.id || 'n/a'}</p>
         <p><strong>Cliente:</strong> ${pedido.cliente}</p>
         <p><strong>Fecha:</strong> ${new Date(pedido.fecha).toLocaleString()}</p>
         <ul style="text-align:left;">${itemsHtml}</ul>

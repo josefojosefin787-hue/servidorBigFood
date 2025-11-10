@@ -27,6 +27,7 @@ try {
   nodemailer = null;
 }
 
+const session = require('express-session');
 const app = express();
 // Forzar uso exclusivo de la base de datos si se define esta variable de entorno
 const USE_DB_ONLY = process.env.USE_DB_ONLY === 'true' || process.env.FORCE_DB === 'true';
@@ -45,6 +46,29 @@ app.use(bodyParser.json({
     }
   }
 }));
+
+// Session middleware (para administración)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'bigfoodadmin2025',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
+}));
+
+// Protección simple para la ruta /admin.html: redirige a login si no autenticado
+app.use((req, res, next) => {
+  try {
+    const pathReq = req.path || req.originalUrl || '/';
+    if (pathReq === '/admin.html' || pathReq.startsWith('/admin') || pathReq.startsWith('/api/admin')) {
+      // permitir acceso a endpoints de login/verify/logout sin auth
+      if (pathReq.startsWith('/api/admin') || pathReq === '/admin-login.html' || pathReq === '/verify.html') return next();
+      if (!req.session || !req.session.isAuthenticated) return res.redirect('/admin-login.html');
+    }
+  } catch (e) { /* ignore */ }
+  next();
+});
+
+// Servir archivos estáticos (ahora después de haber añadido sesiones y middleware de protección)
 app.use(express.static(path.join(__dirname)));
 
 // Si se exige DB-only, bloquear las rutas /api si no hay pool configurado
@@ -423,6 +447,101 @@ let mailTransport = null;
   }
 })();
 
+// Rutas de administración: login con verificación por código (2FA) usando sesiones
+app.post('/api/admin/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email y password requeridos' });
+  const pool = app.locals.db;
+  try {
+    // Intentar buscar usuario en DB (tabla 'usuarios' - ajustar si tu tabla tiene otro nombre)
+    if (pool) {
+      try {
+        const q = await pool.query('SELECT * FROM usuarios WHERE email = $1 LIMIT 1', [email]);
+        let user = q.rows && q.rows.length ? q.rows[0] : null;
+        if (!user) {
+          // intentar otras convenciones
+          const q2 = await pool.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]).catch(() => ({ rows: [] }));
+          user = q2.rows && q2.rows.length ? q2.rows[0] : null;
+        }
+        if (user) {
+          // intentar verificar contraseña: si bcrypt está disponible, usarlo; si no, comparar directo (depende de cómo estén guardadas)
+          let valid = false;
+          try {
+            const bcrypt = require('bcrypt');
+            if (user.password) valid = await bcrypt.compare(password, user.password);
+          } catch (e) {
+            // bcrypt no disponible o error -> comparar texto plano (solo fallback)
+            valid = (String(user.password || '') === String(password));
+          }
+          if (!valid) return res.status(401).json({ error: 'Credenciales inválidas' });
+
+          // generar código y almacenarlo en sesión
+          const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+          req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email, userId: user.id };
+          // enviar correo
+          try {
+            if (mailTransport) {
+              const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || process.env.GOOGLE_USER_EMAIL || 'no-reply@example.com', to: user.email, subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
+              const info = await mailTransport.sendMail(mailOptions);
+              if (mailTransport.options && mailTransport.options.jsonTransport) console.log('[mail] dev mail:', info.message);
+            } else {
+              console.warn('[mail] mailTransport no configurado: el código sería', verificationCode);
+            }
+          } catch (e) {
+            console.error('[mail] Error enviando código admin:', e.message || e);
+          }
+          return res.json({ status: 'ok', message: 'Código de verificación enviado' });
+        }
+      } catch (e) {
+        console.warn('[admin] error consultando usuario en DB:', e && e.message ? e.message : e);
+      }
+    }
+
+    // Fallback simple (modo desarrollo) - credenciales estáticas como en el adjunto
+    if (email === 'admin@gmail.com' && password === '1234') {
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      req.session.pendingVerification = { code: verificationCode, timestamp: Date.now(), email };
+      try {
+        if (mailTransport) {
+          const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: process.env.SMTP_USER || 'ssalasg@alumnos.ceduc.cl', subject: 'Código de verificación - Admin Panel', text: `Tu código de verificación es: ${verificationCode}` };
+          const info = await mailTransport.sendMail(mailOptions);
+          if (mailTransport.options && mailTransport.options.jsonTransport) console.log('[mail] dev mail:', info.message);
+        } else {
+          console.log('[admin] Código de verificación (dev):', verificationCode);
+        }
+      } catch (e) { console.error('[mail] error enviando mail fallback:', e); }
+      return res.json({ status: 'ok', message: 'Código de verificación enviado' });
+    }
+
+    return res.status(401).json({ error: 'Credenciales inválidas' });
+  } catch (err) {
+    console.error('[admin] error login:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+app.post('/api/admin/verify', (req, res) => {
+  const { code } = req.body || {};
+  if (!req.session || !req.session.pendingVerification) return res.status(400).json({ error: 'No hay verificación pendiente' });
+  const { code: storedCode, timestamp } = req.session.pendingVerification;
+  if (Date.now() - timestamp > 10 * 60 * 1000) { delete req.session.pendingVerification; return res.status(400).json({ error: 'El código ha expirado' }); }
+  if (String(code) === String(storedCode)) {
+    req.session.isAuthenticated = true;
+    // opcional: almacenar info del admin en sesión
+    req.session.admin = { email: req.session.pendingVerification.email, id: req.session.pendingVerification.userId || null };
+    delete req.session.pendingVerification;
+    return res.json({ status: 'ok' });
+  }
+  return res.status(401).json({ error: 'Código inválido' });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) return res.status(500).json({ error: 'Error al cerrar sesión' });
+    res.json({ status: 'ok' });
+  });
+});
+
 // Endpoint para crear pedido (código sin cambios)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'inicioSesion.html'));
@@ -752,25 +871,43 @@ app.post('/api/create-checkout-session', async (req, res) => {
 
     // Guardar un pedido provisional en nuestro sistema (estado: 'esperando_pago')
     try {
-      const pedidos = leerPedidos();
-      const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
+      const pool = app.locals.db;
       // intentamos recuperar items desde la petición (si el cliente las envía en metadata) o dejamos vacías
       let items = [];
       try { if (req.body.items) items = req.body.items; } catch (e) { items = []; }
-      const total = items.length ? items.reduce((s, it) => s + (Number(it.precio || 0) * Number(it.cantidad || 1)), 0) : (req.body.total || 0);
-      const pedido = {
-        id,
-        cliente: req.body.cliente || (req.body.metadata && req.body.metadata.cliente) || 'Cliente',
-        email: req.body.email || (req.body.metadata && req.body.metadata.email) || '',
-        items,
-        total,
-        estado: 'esperando_pago',
-        fecha: new Date().toISOString(),
-        sessionId: session.id
-      };
-      pedidos.push(pedido);
-      guardarPedidos(pedidos);
-      console.log('[API] Pedido provisional creado para Checkout session:', session.id, 'pedidoId=', pedido.id);
+      const provisionalTotal = items.length ? items.reduce((s, it) => s + (Number(it.precio || 0) * Number(it.cantidad || 1)), 0) : (req.body.total || 0);
+
+      if (pool) {
+        // Guardar provisional en la DB (orders.external_id = session.id)
+        try {
+          const metadata = { email: req.body.email || null, metodoPago: req.body.metodoPago || null, nota: req.body.nota || null, sessionId: session.id };
+          const sql = `INSERT INTO orders (external_id, items, total, status, customer_name, metadata)
+                       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
+          const params = [session.id, JSON.stringify(items), provisionalTotal, 'esperando_pago', req.body.cliente || (req.body.metadata && req.body.metadata.cliente) || 'Cliente', metadata];
+          const r = await pool.query(sql, params);
+          const row = r.rows[0];
+          console.log('[API] Pedido provisional creado en DB para Checkout session:', session.id, 'pedidoId=', row.id);
+        } catch (err) {
+          console.warn('[API] No se pudo crear pedido provisional en DB:', err.message);
+        }
+      } else {
+        // Fallback JSON: crear pedido provisional en archivo
+        const pedidos = leerPedidos();
+        const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
+        const pedido = {
+          id,
+          cliente: req.body.cliente || (req.body.metadata && req.body.metadata.cliente) || 'Cliente',
+          email: req.body.email || (req.body.metadata && req.body.metadata.email) || '',
+          items,
+          total: provisionalTotal,
+          estado: 'esperando_pago',
+          fecha: new Date().toISOString(),
+          sessionId: session.id
+        };
+        pedidos.push(pedido);
+        guardarPedidos(pedidos);
+        console.log('[API] Pedido provisional creado para Checkout session (fallback):', session.id, 'pedidoId=', pedido.id);
+      }
     } catch (e) {
       console.warn('No se pudo crear pedido provisional:', e.message);
     }
@@ -826,50 +963,118 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
           }
         }
 
-        const pedidos = leerPedidos();
-        // Si existe un pedido provisional con la misma sessionId, lo actualizamos
-        const existingIdx = pedidos.findIndex(p => p.sessionId === sessionId);
-        if (existingIdx !== -1) {
-          pedidos[existingIdx] = {
-            ...pedidos[existingIdx],
-            cliente: metadata.cliente || session.customer_details?.name || pedidos[existingIdx].cliente,
-            email: metadata.email || session.customer_details?.email || pedidos[existingIdx].email,
-            items: items.length ? items : pedidos[existingIdx].items,
-            total: total || pedidos[existingIdx].total || (session.amount_total || 0),
-            estado: 'pagado',
-            fechaPago: new Date().toISOString()
-          };
-          guardarPedidos(pedidos);
-          console.log('[API] Pedido provisional actualizado a pagado para sessionId=', sessionId, 'pedidoId=', pedidos[existingIdx].id);
-        } else {
-          const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
-          const pedido = {
-            id,
-            cliente: metadata.cliente || session.customer_details?.name || 'Cliente',
-            email: metadata.email || session.customer_details?.email || '',
-            items,
-            total: total || (session.amount_total || 0),
-            estado: 'pagado',
-            fecha: new Date().toISOString(),
-            fechaPago: new Date().toISOString(),
-            sessionId
-          };
-          pedidos.push(pedido);
-          guardarPedidos(pedidos);
-          console.log('[API] Pedido creado desde webhook para sessionId=', sessionId, 'pedidoId=', pedido.id);
+        const pool = app.locals.db;
+        // mantenemos una referencia al pedido final que usaremos para el email/envíos
+        let finalPedido = null;
+
+        if (pool) {
+          try {
+            // buscar pedido existente por external_id o metadata.sessionId
+            const findSql = `SELECT * FROM orders WHERE external_id = $1 OR (metadata->> 'sessionId') = $1 LIMIT 1`;
+            const found = await pool.query(findSql, [sessionId]);
+            const metadataFromSession = Object.assign({}, metadata || {}, { sessionId });
+
+            if (found.rows.length) {
+              const existing = found.rows[0];
+              // actualizar pedido existente
+              const updateSql = `UPDATE orders SET items = $1, total = $2, status = $3, customer_name = $4, metadata = $5 WHERE id = $6 RETURNING *`;
+              const params = [items, total || existing.total || (session.amount_total || 0), 'pagado', metadataFromSession.cliente || session.customer_details?.name || existing.customer_name, metadataFromSession, existing.id];
+              const rUp = await pool.query(updateSql, params);
+              const row = rUp.rows[0];
+              finalPedido = {
+                id: row.id,
+                cliente: row.customer_name,
+                email: row.metadata && row.metadata.email ? row.metadata.email : (metadataFromSession.email || session.customer_details?.email || ''),
+                items: row.items,
+                total: Number(row.total),
+                metodoPago: row.metadata && row.metadata.metodoPago ? row.metadata.metodoPago : null,
+                nota: row.metadata && row.metadata.nota ? row.metadata.nota : null,
+                estado: row.status,
+                paymentIntentId: row.metadata && row.metadata.paymentIntentId ? row.metadata.paymentIntentId : null,
+                sessionId: row.external_id || (row.metadata && row.metadata.sessionId ? row.metadata.sessionId : null),
+                fecha: row.created_at,
+                fechaPago: new Date().toISOString()
+              };
+              console.log('[API] Pedido provisional actualizado a pagado en DB para sessionId=', sessionId, 'pedidoId=', finalPedido.id);
+            } else {
+              // insertar nuevo pedido en DB
+              const insertSql = `INSERT INTO orders (external_id, items, total, status, customer_name, metadata) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
+              const params = [sessionId, JSON.stringify(items), total || (session.amount_total || 0), 'pagado', metadata.cliente || session.customer_details?.name || 'Cliente', metadataFromSession];
+              const rIns = await pool.query(insertSql, params);
+              const row = rIns.rows[0];
+              finalPedido = {
+                id: row.id,
+                cliente: row.customer_name,
+                email: row.metadata && row.metadata.email ? row.metadata.email : (metadata.email || session.customer_details?.email || ''),
+                items: row.items,
+                total: Number(row.total),
+                metodoPago: row.metadata && row.metadata.metodoPago ? row.metadata.metodoPago : null,
+                nota: row.metadata && row.metadata.nota ? row.metadata.nota : null,
+                estado: row.status,
+                paymentIntentId: row.metadata && row.metadata.paymentIntentId ? row.metadata.paymentIntentId : null,
+                sessionId: row.external_id || (row.metadata && row.metadata.sessionId ? row.metadata.sessionId : null),
+                fecha: row.created_at,
+                fechaPago: new Date().toISOString()
+              };
+              console.log('[API] Pedido creado desde webhook en DB para sessionId=', sessionId, 'pedidoId=', finalPedido.id);
+            }
+          } catch (e) {
+            console.error('[API] Error creando/actualizando pedido en DB desde webhook:', e);
+          }
+        }
+
+        // Si no se pudo usar DB, usamos el fallback JSON actual
+        if (!finalPedido) {
+          try {
+            const pedidos = leerPedidos();
+            const existingIdx = pedidos.findIndex(p => p.sessionId === sessionId);
+            if (existingIdx !== -1) {
+              pedidos[existingIdx] = {
+                ...pedidos[existingIdx],
+                cliente: metadata.cliente || session.customer_details?.name || pedidos[existingIdx].cliente,
+                email: metadata.email || session.customer_details?.email || pedidos[existingIdx].email,
+                items: items.length ? items : pedidos[existingIdx].items,
+                total: total || pedidos[existingIdx].total || (session.amount_total || 0),
+                estado: 'pagado',
+                fechaPago: new Date().toISOString()
+              };
+              guardarPedidos(pedidos);
+              finalPedido = pedidos[existingIdx];
+              console.log('[API] Pedido provisional actualizado a pagado (fallback) para sessionId=', sessionId, 'pedidoId=', finalPedido.id);
+            } else {
+              const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
+              const pedido = {
+                id,
+                cliente: metadata.cliente || session.customer_details?.name || 'Cliente',
+                email: metadata.email || session.customer_details?.email || '',
+                items,
+                total: total || (session.amount_total || 0),
+                estado: 'pagado',
+                fecha: new Date().toISOString(),
+                fechaPago: new Date().toISOString(),
+                sessionId
+              };
+              pedidos.push(pedido);
+              guardarPedidos(pedidos);
+              finalPedido = pedido;
+              console.log('[API] Pedido creado desde webhook (fallback) para sessionId=', sessionId, 'pedidoId=', pedido.id);
+            }
+          } catch (e) {
+            console.error('Error creando pedido desde webhook (fallback):', e);
+          }
         }
 
         // enviar correo al cliente con comprobante si está configurado
-        const itemsHtml = pedido.items.map(i => `<li>${i.cantidad} x ${i.nombre} - $${(i.precio * i.cantidad)}</li>`).join('');
+        const itemsHtml = (finalPedido.items || []).map(i => `<li>${i.cantidad} x ${i.nombre} - $${(i.precio * i.cantidad)}</li>`).join('');
         const html = `
-          <h2>Comprobante de pago - Pedido #${pedido.id}</h2>
-          <p>Cliente: ${pedido.cliente}</p>
-          <p>Fecha: ${new Date(pedido.fechaPago).toLocaleString()}</p>
+          <h2>Comprobante de pago - Pedido #${finalPedido.id}</h2>
+          <p>Cliente: ${finalPedido.cliente}</p>
+          <p>Fecha: ${new Date(finalPedido.fechaPago || new Date()).toLocaleString()}</p>
           <ul>${itemsHtml}</ul>
-          <p><strong>Total: $${pedido.total}</strong></p>
+          <p><strong>Total: $${finalPedido.total}</strong></p>
         `;
 
-        if (mailTransport && process.env.SMTP_USER && pedido.email) {
+        if (mailTransport && process.env.SMTP_USER && finalPedido.email) {
           // Intentar generar PDF como comprobante si pdfkit está disponible
           const attachments = [];
           try {
@@ -879,33 +1084,33 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
             doc.on('data', buffers.push.bind(buffers));
             const pdfEnd = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(buffers))));
 
-            doc.fontSize(18).text(`Comprobante de pago - Pedido #${pedido.id}`, { align: 'center' });
+            doc.fontSize(18).text(`Comprobante de pago - Pedido #${finalPedido.id}`, { align: 'center' });
             doc.moveDown();
-            doc.fontSize(12).text(`Cliente: ${pedido.cliente}`);
-            if (pedido.email) doc.text(`Email: ${pedido.email}`);
-            doc.text(`Fecha: ${new Date(pedido.fechaPago).toLocaleString()}`);
+            doc.fontSize(12).text(`Cliente: ${finalPedido.cliente}`);
+            if (finalPedido.email) doc.text(`Email: ${finalPedido.email}`);
+            doc.text(`Fecha: ${new Date(finalPedido.fechaPago || new Date()).toLocaleString()}`);
             doc.moveDown();
             doc.text('Detalle de items:', { underline: true });
-            pedido.items.forEach(i => {
+            (finalPedido.items || []).forEach(i => {
               doc.moveDown(0.2);
               doc.text(`${i.cantidad} x ${i.nombre} - $${(i.precio * i.cantidad)}`);
             });
             doc.moveDown();
-            doc.fontSize(14).text(`Total: $${pedido.total}`, { bold: true });
+            doc.fontSize(14).text(`Total: $${finalPedido.total}`, { bold: true });
             doc.end();
 
             const pdfBuffer = await pdfEnd;
-            attachments.push({ filename: `comprobante_pedido_${pedido.id}.pdf`, content: pdfBuffer });
+            attachments.push({ filename: `comprobante_pedido_${finalPedido.id}.pdf`, content: pdfBuffer });
           } catch (e) {
             console.warn('No se pudo generar PDF (pdfkit no instalado?):', e.message);
           }
 
           // Enviar correo con adjunto si existe
-          const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER, to: pedido.email, subject: `Comprobante de pago - Pedido #${pedido.id}`, html };
+          const mailOptions = { from: process.env.SMTP_FROM || process.env.SMTP_USER, to: finalPedido.email, subject: `Comprobante de pago - Pedido #${finalPedido.id}`, html };
           if (attachments.length) mailOptions.attachments = attachments;
 
           mailTransport.sendMail(mailOptions)
-            .then(() => console.log('Correo enviado a', pedido.email))
+            .then(() => console.log('Correo enviado a', finalPedido.email))
             .catch(err => console.error('Error enviando correo:', err));
         }
 
