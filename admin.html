@@ -7,7 +7,103 @@
   <link rel="stylesheet" href="/styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* Estilos pequeños para el panel admin */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    body.admin-page {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px;
+      background: linear-gradient(140deg, #0b8e4d 0%, #34a853 55%, #0b5e28 100%);
+    }
+
+    .admin-header {
+      width: 100%;
+      max-width: 1100px;
+      margin-bottom: 24px;
+      text-align: center;
+      color: #ffffff;
+    }
+
+    .admin-header-content {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 28px 32px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 45px rgba(5, 64, 33, 0.28);
+    }
+
+    .admin-container {
+      width: 100%;
+      max-width: 1100px;
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: 26px;
+      padding: 36px 32px;
+      position: relative;
+      box-shadow: 0 28px 65px rgba(6, 62, 30, 0.28);
+    }
+
+    .db-status-banner {
+      position: absolute;
+      right: 24px;
+      top: 24px;
+      padding: 7px 16px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      background: #eef7f0;
+      color: #0a6c2c;
+      box-shadow: 0 15px 30px rgba(9, 74, 38, 0.16);
+    }
+
+    .admin-section {
+      background: #ffffff;
+      border: 1px solid rgba(11, 94, 42, 0.08);
+      border-radius: 20px;
+      padding: 26px 24px;
+      margin-bottom: 26px;
+      box-shadow: 0 15px 28px rgba(17, 85, 45, 0.08);
+    }
+
+    .section-header h2 {
+      margin: 0 0 12px;
+      color: #0b5a2a;
+      font-weight: 600;
+    }
+
+    .search-container {
+      margin-bottom: 1rem;
+    }
+
+    #searchInput {
+      width: 100%;
+      max-width: 360px;
+      padding: 10px 14px;
+      border: 1px solid rgba(25, 128, 70, 0.25);
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    #searchInput:focus {
+      outline: none;
+      border-color: #0f8a49;
+      box-shadow: 0 0 0 3px rgba(15, 138, 73, 0.18);
+    }
+
+    #nuevoImg {
+      max-width: 420px;
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
     .cell-img-edit {
       max-width: 260px;
       display: inline-block;
@@ -16,25 +112,25 @@
       white-space: nowrap;
       vertical-align: middle;
     }
-    .search-container {
-      margin-bottom: 1rem;
-    }
-    #searchInput {
-      width: 100%;
-      max-width: 300px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      margin-bottom: 1rem;
-    }
-    #nuevoImg {
-      max-width: 420px;
-      width: 100%;
-      box-sizing: border-box;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      display: inline-block;
+
+    @media (max-width: 900px) {
+      body.admin-page {
+        padding: 32px 12px;
+      }
+
+      .admin-container {
+        padding: 28px 20px;
+      }
+
+      .admin-header-content {
+        padding: 24px;
+      }
+
+      .db-status-banner {
+        position: static;
+        display: inline-block;
+        margin-bottom: 16px;
+      }
     }
   </style>
 </head>
@@ -47,7 +143,7 @@
   </header>
 
   <main class="admin-container">
-    <div id="dbStatus" style="position:fixed;right:12px;top:12px;padding:6px 10px;border-radius:6px;background:#eee;color:#222;font-size:.9rem;z-index:999;">DB: comprobando...</div>
+    <div id="dbStatus" class="db-status-banner">DB: comprobando...</div>
     <!-- Sección para agregar productos -->
     <section id="controls" class="admin-section">
       <div class="section-header">
@@ -113,13 +209,21 @@
 
     function normalizeCategory(cat) {
       if (!cat) return '';
-      const low = cat.toLowerCase().trim();
-      if (['generales', 'comidarapida', 'comida rapida'].includes(low)) return 'comida rapida';
-      return low;
+      const base = String(cat)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+      if (['generales', 'comidarapida', 'comida rapida'].includes(base)) return 'comida rapida';
+      return base;
     }
 
     function displayLabel(cat) {
-      return String(cat)
+      const raw = String(cat || '').trim();
+      if (!raw) return '';
+      const norm = raw.toLowerCase();
+      if (norm === 'comida rapida') return 'Comida rápida';
+      return raw
         .split(' ')
         .map(w => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
