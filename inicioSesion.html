@@ -40,7 +40,7 @@
             width: 400px;
             height: auto;
             border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgb(0, 0, 0);
         }
         
         .section-title {
@@ -141,6 +141,13 @@
             font-size: 2rem;
             cursor: pointer;
         }
+
+        /* Make the scroll arrow white */
+        .scroll-indicator i { color: #fff !important; }
+
+        /* Make the floating menu '+' icon white */
+        .menu-content .menu-item#menu,
+        .menu-content .menu-item#menu i { color: #fff !important; }
         
         @keyframes bounce {
             0%, 20%, 50%, 80%, 100% {
