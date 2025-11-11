@@ -1,19 +1,412 @@
 <!DOCTYPE html>
 <html lang="es">
-<link rel="stylesheet" href="/styles.css">
 
 <head>
   <meta charset="UTF-8">
-  <title>Pago Exitoso</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pedido Confirmado - BigFood</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bowlby+One:wght@400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Estilos específicos para la página de éxito */
+    .success-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-gradient);
+      padding: 20px;
+    }
+
+    .success-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+      text-align: center;
+    }
+
+    [data-theme="dark"] .success-container {
+      background: var(--card-bg);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .success-header {
+      margin-bottom: 30px;
+    }
+
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, #1a7841 0%, #25a65a 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      animation: scaleIn 0.6s ease-out;
+    }
+
+    .success-title {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1a7841;
+      margin: 20px 0 10px;
+    }
+
+    [data-theme="dark"] .success-title {
+      color: #4CAF50;
+    }
+
+    .success-subtitle {
+      font-size: 1rem;
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    [data-theme="dark"] .success-subtitle {
+      color: #ccc;
+    }
+
+    .voucher-section {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 30px 0;
+      border-left: 4px solid #1a7841;
+      text-align: left;
+    }
+
+    [data-theme="dark"] .voucher-section {
+      background: #363636;
+      border-left-color: #4CAF50;
+    }
+
+    .voucher-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #1a7841;
+      margin: 0 0 20px 0;
+      text-align: center;
+    }
+
+    [data-theme="dark"] .voucher-title {
+      color: #4CAF50;
+    }
+
+    .voucher-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .voucher-field {
+      text-align: left;
+    }
+
+    .voucher-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    [data-theme="dark"] .voucher-label {
+      color: #aaa;
+    }
+
+    .voucher-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #2c3e50;
+      word-break: break-word;
+    }
+
+    [data-theme="dark"] .voucher-value {
+      color: #e0e0e0;
+    }
+
+    .voucher-items {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+
+    [data-theme="dark"] .voucher-items {
+      background: #262626;
+    }
+
+    .items-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #1a7841;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    [data-theme="dark"] .items-title {
+      color: #4CAF50;
+    }
+
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #e9ecef;
+      font-size: 0.95rem;
+    }
+
+    [data-theme="dark"] .item-row {
+      border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .item-row:last-child {
+      border-bottom: none;
+    }
+
+    .item-qty {
+      color: #999;
+      font-weight: 500;
+    }
+
+    [data-theme="dark"] .item-qty {
+      color: #aaa;
+    }
+
+    .item-price {
+      font-weight: 600;
+      color: #1a7841;
+    }
+
+    [data-theme="dark"] .item-price {
+      color: #4CAF50;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      margin-top: 10px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #1a7841;
+    }
+
+    [data-theme="dark"] .total-row {
+      background: #3a3a3a;
+      color: #4CAF50;
+    }
+
+    .status-section {
+      padding: 15px;
+      background: #d1e7dd;
+      border-left: 4px solid #28a745;
+      border-radius: 8px;
+      color: #0f5132;
+      margin: 20px 0;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    [data-theme="dark"] .status-section {
+      background: #1b3a1b;
+      border-left-color: #4CAF50;
+      color: #90ee90;
+    }
+
+    .status-section.pending {
+      background: #fff3cd;
+      border-left-color: #ffc107;
+      color: #856404;
+    }
+
+    [data-theme="dark"] .status-section.pending {
+      background: #3a3a1b;
+      border-left-color: #ffc107;
+      color: #ffdd57;
+    }
+
+    .notification-banner {
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      animation: slideDown 0.5s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .actions-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #1a7841 0%, #25a65a 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(26, 120, 65, 0.2);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(26, 120, 65, 0.3);
+    }
+
+    .btn-secondary {
+      background: #e9ecef;
+      color: #2c3e50;
+      border: 2px solid #ddd;
+    }
+
+    [data-theme="dark"] .btn-secondary {
+      background: #404040;
+      color: #e0e0e0;
+      border-color: #505050;
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+      background: #ddd;
+    }
+
+    [data-theme="dark"] .btn-secondary:hover {
+      background: #505050;
+    }
+
+    .error-section {
+      background: #f8d7da;
+      border-left: 4px solid #dc3545;
+      color: #721c24;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: left;
+    }
+
+    [data-theme="dark"] .error-section {
+      background: #3a1a1a;
+      border-left-color: #dc3545;
+      color: #ff9999;
+    }
+
+    @media (max-width: 768px) {
+      .success-container {
+        padding: 25px;
+      }
+
+      .success-title {
+        font-size: 1.6rem;
+      }
+
+      .voucher-info {
+        grid-template-columns: 1fr;
+      }
+
+      .actions-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .success-page {
+        padding: 15px;
+      }
+
+      .success-container {
+        padding: 20px;
+      }
+
+      .success-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 30px;
+      }
+
+      .success-title {
+        font-size: 1.3rem;
+      }
+
+      .voucher-section {
+        padding: 20px;
+      }
+    }
+  </style>
 </head>
 
-<body class="contenedor">
-  <h1 class="titulo">¡Gracias por tu compra!</h1>
-  <p>Tu pago fue procesado correctamente.</p>
-  <div id="voucher"></div>
-  <a class="volverInicio"  href="inicioSesion.html">Volver al inicio</a>
+<body>
+  <div class="success-page">
+    <div class="success-container">
+      <!-- Encabezado de éxito -->
+      <div class="success-header">
+        <div class="success-icon">✓</div>
+        <h1 class="success-title">¡Pedido Confirmado!</h1>
+        <p class="success-subtitle">Tu pago ha sido procesado correctamente</p>
+      </div>
+
+      <!-- Voucher del pedido -->
+      <div id="voucher"></div>
+
+      <!-- Sección de acciones -->
+      <div class="actions-section">
+        <a href="pagina2.html" class="btn-primary">Hacer otro pedido</a>
+        <a href="inicioSesion.html" class="btn-secondary">Volver al inicio</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Script para generar el voucher -->
   <script src="success-voucher.js"></script>
-  <script src="/scripts/input_filter.js"></script>
+  
+  <!-- Script para tema oscuro/claro -->
+  <script>
+    // Control de tema oscuro/claro (consistente con el resto de la app)
+    const toggleSwitch = document.querySelector('#checkbox');
+    const currentTheme = localStorage.getItem('theme');
+    
+    if (currentTheme) {
+      document.documentElement.setAttribute('data-theme', currentTheme);
+    }
+
+    // Observer para cambios de tema desde otra página
+    const themeObserver = setInterval(() => {
+      const theme = localStorage.getItem('theme');
+      if (theme !== document.documentElement.getAttribute('data-theme')) {
+        document.documentElement.setAttribute('data-theme', theme || 'light');
+      }
+    }, 500);
+
+    window.addEventListener('beforeunload', () => clearInterval(themeObserver));
+  </script>
 </body>
 
 </html>
