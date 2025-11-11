@@ -116,7 +116,10 @@ app.use((req, res, next) => {
     'mierda', 'hijo de puta', 'puta madre', 'puta', 'cabron', 'fuck', 'shit','tula', 'pichula', 'weon', 'webon', 'conchetumare', 'conchetumadre', 'putito', 'pablo', 'brian', 'pene', 'culo', 'raja', 'tetita','milf',
     'drop database', 'drop table', 'delete from', 'truncate', 'insert', 'update', 'alter table', 'exec ', 'union select', 'or 1=1', '--', '/**/', 
   ];
-  const esc = s => String(s).replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  // Safely escape all regex metacharacters. Use a standard character class that
+  // includes backslash and the common metacharacters. This prevents tokens like
+  // `*` or `+` from producing "Nothing to repeat" when the parts are joined.
+  const esc = s => String(s).replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
   const BANNED_RE = new RegExp(BANNED.map(esc).join('|'), 'i');
 
   function scanValue(v) {

@@ -1,4 +1,4 @@
-<# install_node_windows.ps1
+﻿<# install_node_windows.ps1
    Intenta instalar Node.js LTS con winget/choco y luego ejecuta npm install en el proyecto.
 #>
 
