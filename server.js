@@ -905,8 +905,36 @@ app.patch('/api/pedidos/:id', async (req, res) => {
       if (typeof update.sessionId !== 'undefined') metadataUpdate.sessionId = update.sessionId;
 
       const sql = `UPDATE orders SET status = $1, customer_name = $2, items = $3, total = $4, metadata = $5 WHERE id = $6 RETURNING *`;
-      const params = [newStatus, newCustomer, newItems, newTotal, metadataUpdate, id];
-      const r = await pool.query(sql, params);
+      // Ensure JSON columns are passed as JSON (string) to avoid invalid input syntax
+      let itemsParam = newItems;
+      let metadataParam = metadataUpdate;
+      try {
+        // If items is already a string (bad data), try to parse it; otherwise stringify
+        if (typeof newItems === 'string') {
+          try { itemsParam = JSON.parse(newItems); } catch (e) { /* keep as string, will stringify below */ }
+        }
+        itemsParam = JSON.stringify(itemsParam);
+      } catch (e) {
+        itemsParam = JSON.stringify([]);
+      }
+      try {
+        if (typeof metadataUpdate === 'string') {
+          try { metadataParam = JSON.parse(metadataUpdate); } catch (e) { /* keep as string */ }
+        }
+        metadataParam = JSON.stringify(metadataParam);
+      } catch (e) {
+        metadataParam = JSON.stringify({});
+      }
+
+      const params = [newStatus, newCustomer, itemsParam, newTotal, metadataParam, id];
+      let r;
+      try {
+        r = await pool.query(sql, params);
+      } catch (err) {
+        console.error('[API] Error actualizando pedido en DB:', err && err.message ? err.message : err);
+        console.error('[API] UPDATE params:', { id, newStatus, newCustomer, itemsParam, newTotal, metadataParam });
+        throw err;
+      }
       const row2 = r.rows[0];
       const pedido = {
         id: row2.id,
