@@ -127,359 +127,187 @@
               <div class="form-group">
                 <input id="cliente" class="form-input" placeholder="Nombre completo" aria-label="Nombre del cliente" />
               </div>
+<!DOCTYPE html>
+<html lang="es">
 
-              <div class="form-group">
-                <input id="email" class="form-input" placeholder="Correo electrónico" aria-label="Correo electrónico" />
-              </div>
-
-              <div class="form-group">
-                <textarea id="notaPedido" class="form-input" placeholder="Notas del pedido (opcional)" rows="3" aria-label="Notas del pedido"></textarea>
-              </div>
-
-              <div class="form-group">
-                <label for="metodoPago" class="form-label">Método de pago</label>
-                <select id="metodoPago" class="form-input" aria-label="Método de pago">
-                  <option value="card">Tarjeta (online)</option>
-                  <option value="efectivo">Efectivo</option>
-                  <option value="junaeb">JUNAEB</option>
-                </select>
-              </div>
-
-              <div id="card-section" class="card-section" style="display: none;">
-                <label class="form-label">Tarjeta de garantía</label>
-                <div id="card-element" class="stripe-element"></div>
-                <div id="card-errors" class="error-message" role="alert"></div>
-              </div>
-
-              <button id="enviar" class="btn-submit" type="button">Procesar Pedido</button>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-    </main>
-  </div>
-
-    <div class="menu-content">
-    <span class="menu-item" id="menu" title="Menú de redes sociales" role="button" tabindex="0">
-      <img src="svg/plus.svg" alt="Menú">
-    </span>
-    <a href="https://web.facebook.com/martita.lebu" target="_blank" class="menu-item" title="Síguenos en Facebook" aria-label="Facebook">
-      <img src="svg/facebook.svg" alt="Facebook">
-    </a>
-    <a href="https://www.instagram.com/pasteleriamartitalebu/" target="_blank" class="menu-item" title="Síguenos en Instagram" aria-label="Instagram">
-      <img src="svg/instagram.svg" alt="Instagram">
-    </a>
-    <a href="#" target="_blank" class="menu-item" title="Síguenos en Youtube" aria-label="Youtube">
-      <img src="svg/youtube.svg" alt="Youtube">
-    </a>
-  </div>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Menú - BigFood</title>
+  <link rel="stylesheet" href="/styles.css">
   <script src="https://js.stripe.com/v3/"></script>
-  <script src="scripts/input_filter.js"></script>
+  <style>
+    /* Small page-specific tweaks to make layout similar to the reference */
+    header.site-header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);position:sticky;top:0;z-index:50}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{height:36px}
+    nav.categories{display:flex;gap:12px;align-items:center;overflow-x:auto;padding:12px 20px;background:#fff}
+    .cat-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer}
+    .cat-btn.active{box-shadow:0 6px 16px rgba(0,0,0,.08);background:#fff}
+    .cat-btn img{width:48px;height:48px;object-fit:cover;border-radius:8px}
+    .main{display:flex;gap:24px;max-width:1200px;margin:28px auto;padding:0 20px}
+    .catalog{flex:1}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
+    .product{background:var(--card-bg);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);text-align:center}
+    .product img{height:140px;object-fit:contain;width:100%;border-radius:8px}
+    .product h4{margin:10px 0 6px;font-size:1rem}
+    .product .price{font-weight:700;color:#1a7841}
+    aside.cart{width:320px;background:var(--carrito-bg);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06);height:fit-content}
+    aside.cart .line{display:flex;align-items:center;gap:8px;margin:10px 0}
+    .qty{display:flex;gap:6px;align-items:center}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:999}
+    .modal.active{display:flex}
+    .modal-box{background:var(--card-bg);padding:18px;border-radius:10px;max-width:520px;width:95%}
+    .modal-box img{width:120px;height:120px;object-fit:cover;border-radius:8px}
+    .product-desc{color:#444;margin-top:8px}
+    @media(max-width:900px){.main{flex-direction:column}.cart{width:100%}}
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <img src="/img/martitaLogoGrande.png" alt="BigFood logo" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+      <div>
+        <div style="font-weight:700">Menú de la Cafetería</div>
+        <div style="font-size:.9rem;color:#666">Pide rápido y recoge</div>
+      </div>
+    </div>
+    <div>
+      <a href="/admin-login.html" style="text-decoration:none"><button class="boton-enviar">Entrar</button></a>
+    </div>
+  </header>
+
+  <nav class="categories" aria-label="Categorías" id="categoriesNav"></nav>
+
+  <main class="main">
+    <section class="catalog">
+      <h2 style="margin:0 0 10px 0;color:#333;font-size:1.4rem">Productos</h2>
+      <div class="grid" id="productsGrid" aria-live="polite"></div>
+    </section>
+
+    <aside class="cart" aria-label="Carrito">
+      <h3 style="margin:0 0 8px 0;color:#1a7841">Carrito</h3>
+      <div id="cartItems"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><strong>Total</strong><strong id="cartTotal">$0</strong></div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
+      <div class="line"><input id="cliente" placeholder="Tu nombre" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
+      <div class="line"><input id="email" placeholder="Correo electrónico" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
+      <div class="line"><textarea id="notaPedido" rows="2" placeholder="Notas (opcional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea></div>
+      <div class="line">
+        <select id="metodoPago" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
+          <option value="card">Tarjeta (online)</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="junaeb">JUNAEB</option>
+        </select>
+      </div>
+      <div style="margin-top:12px">
+        <button id="procesar" class="btn-submit" style="width:100%">Procesar Pedido</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Product details modal -->
+  <div id="productModal" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-box">
+      <button id="closeModal" style="float:right;border:none;background:none;font-size:20px">&times;</button>
+      <div style="display:flex;gap:14px;align-items:center">
+        <img id="modalImg" src="/img/placeholder.svg" alt="">
+        <div style="flex:1">
+          <h3 id="modalTitle" style="margin:0">Nombre</h3>
+          <div id="modalPrice" style="color:#1a7841;font-weight:700;margin-top:6px">$0</div>
+          <div class="product-desc" id="modalDesc">Descripción breve</div>
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+            <label>Cantidad</label>
+            <input id="modalQty" type="number" value="1" min="1" style="width:70px;padding:6px;border-radius:6px;border:1px solid #ddd">
+            <button id="modalAdd" class="boton-enviar">Agregar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Banned-word modal (client-side) -->
+  <div id="bannedModal" class="modal" aria-hidden="true">
+    <div class="modal-box">
+      <h3>Palabra indebida detectada</h3>
+      <p id="bannedMessage">Se ha detectado una palabra no permitida. Por favor cámbiala para continuar.</p>
+      <div style="text-align:right;margin-top:10px">
+        <button id="bannedOk" class="btn-submit" style="background:#18944c">OK</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // === CONTROL DE TEMA OSCURO ===
-    const toggleSwitch = document.querySelector('#checkbox');
-    
-    // Verificar si hay una preferencia guardada
-    const currentTheme = localStorage.getItem('theme');
-    if (currentTheme) {
-        document.documentElement.setAttribute('data-theme', currentTheme);
-        if (currentTheme === 'dark') {
-            toggleSwitch.checked = true;
-        }
+    // Basic client implementation that uses the same API as the original app.
+    const API_PRODUCTS = '/api/products';
+    let products = [];
+    let cart = JSON.parse(localStorage.getItem('cart')||'[]');
+
+    // Banned tokens (same as server). Keep lower-case here.
+    const BANNED_TOKENS = ['mierda','hijo de puta','puta madre','puta','cabron','fuck','shit','tula','pichula','weon','webon','conchetumare','conchetumadre','putito','pablo','brian','pene','culo','raja','tetita','milf','drop database','drop table','delete from','truncate','insert','update','alter table','exec ','union select','or 1=1','--','/**/'];
+    const esc = s=>String(s).replace(/[\\^$.*+?()\[\]{}|]/g,'\\$&');
+    function findBannedInText(text){ if(!text) return null; const t=String(text).toLowerCase(); for(const token of BANNED_TOKENS){ const tok=token.toLowerCase(); if(/^\w+$/.test(tok)){ const re=new RegExp('\\b'+esc(tok)+'\\b','i'); if(re.test(t)) return token;} else { if(t.indexOf(tok)!==-1) return token; } } return null; }
+
+    // Fetch products
+    async function fetchProducts(){ try{ const r=await fetch(API_PRODUCTS); products = await r.json(); renderCategories(); renderProducts(); }catch(e){ console.error('fetchProducts',e); products=[]; renderProducts(); } }
+
+    // Render categories
+    function renderCategories(){ const nav = document.getElementById('categoriesNav'); nav.innerHTML=''; const cats = Array.from(new Set(products.map(p=>p.categoria||'Otros'))); // include 'Todos' first
+      const allBtn = createCatButton('Todos','/img/MartitaLogoPequeño.png',true); nav.appendChild(allBtn);
+      cats.forEach(c=>{ const img = (products.find(p=>p.categoria===c && p.img) || {}).img || '/img/MartitaLogoPequeño.png'; nav.appendChild(createCatButton(c,img,false)); });
+    }
+    function createCatButton(cat,img,active){ const btn = document.createElement('button'); btn.className='cat-btn'+(active? ' active':''); btn.innerHTML=`<img src='${img}' alt='${cat}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'"><small style='font-size:.85rem'>${cat}</small>`; btn.dataset.cat=cat; btn.addEventListener('click',()=>{ document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderProducts(cat); }); return btn; }
+
+    // Render product grid
+    function renderProducts(filter){ const grid = document.getElementById('productsGrid'); grid.innerHTML=''; const list = (filter && filter!=='Todos') ? products.filter(p=>p.categoria===filter) : products; list.forEach(p=>{ const div=document.createElement('div'); div.className='product'; div.innerHTML = `
+        <img src='${p.img||"/img/placeholder.svg"}' alt='${p.nombre||"Producto"}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+        <h4>${p.nombre||'Sin nombre'}</h4>
+        <div class='price'>$${typeof p.precio!=='undefined'?Number(p.precio):'0'}</div>
+      `; div.addEventListener('click',()=> openProductModal(p)); grid.appendChild(div); });
     }
 
-    toggleSwitch.addEventListener('change', function(e) {
-        if (e.target.checked) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.setAttribute('data-theme', 'light');
-            localStorage.setItem('theme', 'light');
-        }
-    });
+    // Cart functions
+    function addToCart(product, qty=1){ const existing = cart.find(i=>i.id===product.id); if(existing) existing.cantidad += qty; else cart.push({ id:product.id, nombre:product.nombre, precio:product.precio, cantidad: qty }); localStorage.setItem('cart',JSON.stringify(cart)); renderCart(); }
+    function renderCart(){ const el = document.getElementById('cartItems'); el.innerHTML=''; if(!cart.length){ el.innerHTML='<p style="color:#666">Carrito vacío</p>'; document.getElementById('cartTotal').textContent='$0'; return; } let total=0; cart.forEach(item=>{ total += (item.precio||0)*item.cantidad; const row = document.createElement('div'); row.style.display='flex'; row.style.alignItems='center'; row.style.gap='10px'; row.style.marginBottom='8px'; row.innerHTML = `<div style="flex:1">${item.cantidad} x ${item.nombre}</div><div style="font-weight:700">$${(item.precio*item.cantidad)}</div><div><button data-id='${item.id}' style='margin-left:8px'>-</button></div>`; row.querySelector('button').addEventListener('click',()=>{ item.cantidad--; if(item.cantidad<=0) cart = cart.filter(c=>c.id!==item.id); localStorage.setItem('cart',JSON.stringify(cart)); renderCart(); }); el.appendChild(row); }); document.getElementById('cartTotal').textContent = '$'+total; }
 
-    // === MENÚ Y CARRITO ===
-    const btnMenu = document.querySelector('#menu'),
-      menuContent = document.querySelector('.menu-content');
-    btnMenu.addEventListener('click', () => {
-      menuContent.classList.toggle('menu-active');
-    });
+    // Product modal
+    let currentModalProduct = null;
+    function openProductModal(p){ currentModalProduct = p; document.getElementById('modalImg').src = p.img || '/img/placeholder.svg'; document.getElementById('modalTitle').textContent = p.nombre || 'Sin nombre'; document.getElementById('modalPrice').textContent = '$'+(typeof p.precio!=='undefined'?Number(p.precio):0); document.getElementById('modalDesc').textContent = p.description || p.descripcion || 'Descripción: ejemplo - bombones con relleno de distintos sabores.'; document.getElementById('productModal').classList.add('active'); document.getElementById('productModal').setAttribute('aria-hidden','false'); }
+    document.getElementById('closeModal').addEventListener('click',()=>{ document.getElementById('productModal').classList.remove('active'); document.getElementById('productModal').setAttribute('aria-hidden','true'); });
+    document.getElementById('modalAdd').addEventListener('click',()=>{ const q = Math.max(1, Number(document.getElementById('modalQty').value||1)); if(currentModalProduct) addToCart(currentModalProduct,q); document.getElementById('productModal').classList.remove('active'); });
 
-    // Base para las rutas de imagen
-  // Rutas base de imágenes; se asume carpeta local `img/` en producción
-  const IMAGES_BASE = '/img';
-  const PLACEHOLDER = IMAGES_BASE + '/placeholder.svg';
+    // Banned modal
+    function showBanned(token){ document.getElementById('bannedMessage').textContent = `Se detectó: "${token}". Cámbiala para continuar.`; document.getElementById('bannedModal').classList.add('active'); document.getElementById('bannedModal').setAttribute('aria-hidden','false'); }
+    document.getElementById('bannedOk').addEventListener('click',()=>{ document.getElementById('bannedModal').classList.remove('active'); document.getElementById('bannedModal').setAttribute('aria-hidden','true'); });
 
-  let productos = [];
-  // Iniciamos carrito leyendo lo que haya en localStorage (no sobrescribimos)
-  let carrito = JSON.parse(localStorage.getItem('cart') || '[]');
-
-  const carritoItems = document.getElementById('carritoItems');
-  const totalEl = document.getElementById('total');
-
-  // Stripe Elements (se inicializa en la IIFE de inicialización más abajo)
-  let stripe = null;
-  let elements = null;
-  let cardElement = null;
-  let publishableKey = null;
-
-  function mountCard() {
-    if (!elements || cardElement) return;
-    cardElement = elements.create('card', { hidePostalCode: true });
-    cardElement.mount('#card-element');
-    cardElement.on('change', (ev) => {
-      const el = document.getElementById('card-errors');
-      el.textContent = ev.error ? ev.error.message : '';
-    });
-  }
-
-  function unmountCard() {
-    if (cardElement) {
-      try { cardElement.unmount(); } catch (e) { /* ignore */ }
-      cardElement = null;
-    }
-    const el = document.getElementById('card-errors'); if (el) el.textContent = '';
-  }
-
-    async function fetchProducts() {
-      try {
-        const res = await fetch('/api/products');
-        const data = await res.json();
-        productos = data;
-        return productos;
-      } catch (e) {
-        console.error('No se pudo cargar productos', e);
-        return [];
-      }
-    }
-
-    function createModal(cat, items){
-      const modalId = `modal-${cat}`;
-      if (document.getElementById(modalId)) return;
-      const modal = document.createElement('div');
-      modal.className = 'modal'; modal.id = modalId;
-      modal.innerHTML = `
-        <div class="modal-content" role="dialog" aria-modal="true">
-          <button class="close" data-close>&times;</button>
-          <h2>${cat[0].toUpperCase()+cat.slice(1)}</h2>
-          <div class="productos-grid" data-grid></div>
-        </div>`;
-      // cerrar con botón
-      modal.querySelector('[data-close]').addEventListener('click', ()=> modal.classList.remove('active'));
-      // cerrar al hacer click en el overlay (fuera del modal-content)
-      modal.addEventListener('click', (ev)=>{ if (ev.target === modal) modal.classList.remove('active'); });
-      // construir grid de productos
-      const grid = modal.querySelector('[data-grid]');
-      items.forEach(p=>{
-        const card = document.createElement('div'); card.className='card';
-        if (!p.disponible) card.classList.add('disabled');
-        const img = p.img ? `<img src='${p.img}' alt='${p.nombre}' style='width:100%;height:120px;object-fit:cover;border-radius:6px;margin-bottom:6px' onerror="this.onerror=null;this.src='${PLACEHOLDER}'"/>` : '';
-        card.innerHTML = `${img}<h4>${p.nombre}</h4><div>$${p.precio}</div><div style="font-size:.85rem;color:#666">${p.variantes? p.variantes.join(' / '):''}</div><div style="margin-top:8px"><button ${p.disponible? '':'disabled'}>Agregar</button></div>`;
-        card.querySelector('button').addEventListener('click', ()=> addToCart(p));
-        grid.appendChild(card);
-      });
-      // añadimos el modal al body para que se superponga correctamente
-      document.body.appendChild(modal);
-    }
-
-    // cerrar cualquier modal con ESC
-    document.addEventListener('keydown', (ev)=>{ if (ev.key === 'Escape'){ document.querySelectorAll('.modal.active').forEach(m=>m.classList.remove('active')); } });
-
-    function renderTabs(products){
-      const tabs = document.getElementById('categoriaTabs');
-      tabs.querySelectorAll('.tab').forEach(tab=>{
-        tab.addEventListener('click', async ()=>{
-          const cat = tab.dataset.cat;
-          const items = products.filter(p=>p.categoria === cat);
-          createModal(cat, items);
-          const modal = document.getElementById(`modal-${cat}`);
-          modal.classList.add('active');
-        });
-      });
-    }
-
-    function addToCart(product){
-      const existing = carrito.find(i=>i.id===product.id);
-      if (existing) existing.cantidad++;
-      else carrito.push({ id:product.id, nombre:product.nombre, precio:product.precio, cantidad:1 });
-      localStorage.setItem('cart', JSON.stringify(carrito));
-      updateCartUI();
-    }
-
-    function updateCartUI(){
-      carritoItems.innerHTML='';
-      let total = 0;
-      carrito.forEach(it=>{
-        total += it.precio * it.cantidad;
-        const prod = productos.find(p=>p.id===it.id) || {};
-        const div = document.createElement('div'); div.className='item';
-        div.innerHTML = `<img src="${prod.img||PLACEHOLDER}" class="cart-thumb" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"/><div>${it.cantidad} x ${it.nombre} - $${it.precio*it.cantidad}</div><div style="margin-left:auto"><button class="rm">-</button></div>`;
-        div.querySelector('.rm').addEventListener('click', ()=>{
-          it.cantidad--; if (it.cantidad<=0) carrito = carrito.filter(c=>c.id!==it.id);
-          localStorage.setItem('cart', JSON.stringify(carrito)); updateCartUI();
-        });
-        carritoItems.appendChild(div);
-      });
-      totalEl.textContent = total;
-    }
-
-    document.getElementById('enviar').addEventListener('click', async ()=>{
+    // Checkout handler (basic: use create-checkout-session or create order)
+    document.getElementById('procesar').addEventListener('click', async ()=>{
       const cliente = document.getElementById('cliente').value.trim();
       const email = document.getElementById('email').value.trim();
-      const notaPedido = document.getElementById('notaPedido').value.trim();
+      const nota = document.getElementById('notaPedido').value.trim();
       const metodo = document.getElementById('metodoPago').value;
-      if (!cliente){ alert('Ingresa tu nombre'); return; }
-      if (!email){ alert('Ingresa un correo válido'); return; }
-      if (carrito.length===0){ alert('Carrito vacío'); return; }
+      // simple validation & banned-words
+      const banned = findBannedInText(cliente) || findBannedInText(nota) || findBannedInText(email);
+      if(banned){ showBanned(banned); return; }
+      if(!cliente){ alert('Ingresa tu nombre'); return; }
+      if(!email){ alert('Ingresa un correo válido'); return; }
+      if(!cart.length){ alert('Carrito vacío'); return; }
       try{
-        if (metodo === 'card'){
-          // pago con tarjeta via Stripe (checkout)
-          const res = await fetch('/api/create-checkout-session',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido }) });
-          const data = await res.json();
-          if (data.url) {
-            // Guardar último cliente y limpiar carrito local antes de redirigir a Stripe Checkout
-            try { localStorage.setItem('ultimoCliente', cliente); } catch(e) {}
-            try { localStorage.removeItem('cart'); } catch(e) {}
-            carrito = [];
-            try { updateCartUI(); } catch(e) {}
-            window.location.href = data.url;
-          }
-          else { alert('No se pudo iniciar el pago'); console.error(data); }
-        } else if (metodo === 'efectivo' || metodo === 'junaeb'){
-          // Flujo presencial con tarjeta de garantía (pre-autorización manual)
-          const total = Number(document.getElementById('total').textContent) || 0;
-          if (!publishableKey) {
-            alert('Stripe no está configurado (clave pública no disponible).');
-            return;
-          }
-
-          mountCard();
-
-          const createResp = await fetch('/api/create-payment-intent', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ amount: total, currency: 'CLP', metadata: { cliente, email } })
-          });
-          const createData = await createResp.json();
-          if (createData.error) { alert('Error creando retención: '+(createData.error.message||createData.error)); console.error(createData); return; }
-          const clientSecret = createData.clientSecret;
-          const paymentIntentId = createData.paymentIntentId;
-
-          const result = await stripe.confirmCardPayment(clientSecret, {
-            payment_method: { card: cardElement, billing_details: { name: cliente, email } }
-          });
-
-          if (result.error) {
-            document.getElementById('card-errors').textContent = result.error.message || 'Error al autorizar la tarjeta';
-            return;
-          }
-
-          const pi = result.paymentIntent;
-          if (pi && pi.status === 'requires_capture') {
-            // Crear pedido y asociar paymentIntentId al pedido
-            const res2 = await fetch('/api/pedidos', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido, metodoPago: metodo, paymentIntentId }) });
-            const data = await res2.json();
-            if (data && data.pedido && data.pedido.id) {
-              // Guardar último cliente y limpiar carrito
-              try { localStorage.setItem('ultimoCliente', cliente); } catch(e){}
-              try { localStorage.removeItem('cart'); } catch(e){}
-              window.location.href = `/success.html?pedidoId=${data.pedido.id}`;
-            } else {
-              alert('No se pudo crear el pedido tras autorizar la garantía'); console.error(data);
-            }
-          } else {
-            alert('Estado inesperado del PaymentIntent: ' + (pi?pi.status:'nulo'));
-            console.log('PaymentIntent result:', pi);
-          }
+        if(metodo === 'card'){
+          const res = await fetch('/api/create-checkout-session',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: cart, nota }) });
+          const data = await res.json(); if(data && data.url){ localStorage.setItem('ultimoCliente',cliente); localStorage.removeItem('cart'); cart=[]; renderCart(); window.location.href = data.url; } else { alert('No se pudo iniciar el pago'); console.error(data); }
         } else {
-          // Otros métodos: crear pedido normal
-          const res = await fetch('/api/pedidos', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido, metodoPago: metodo }) });
-          const data = await res.json();
-          if (data && data.pedido && data.pedido.id) {
-            try { localStorage.setItem('ultimoCliente', cliente); } catch(e){}
-            try { localStorage.removeItem('cart'); } catch(e){}
-            window.location.href = `/success.html?pedidoId=${data.pedido.id}`;
-          } else {
-            alert('No se pudo crear el pedido'); console.error(data);
-          }
+          // simple create order
+          const res = await fetch('/api/pedidos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items:cart, nota, metodoPago:metodo }) });
+          const data = await res.json(); if(data && data.pedido && data.pedido.id){ localStorage.setItem('ultimoCliente',cliente); localStorage.removeItem('cart'); cart=[]; renderCart(); window.location.href = `/success.html?pedidoId=${data.pedido.id}`; } else { alert('No se pudo crear el pedido'); console.error(data); }
         }
-      } catch (e) { alert('Error conectando con el servidor: ' + e.message); }
+      }catch(e){ alert('Error conectando con el servidor: '+(e.message||e)); }
     });
 
-    // ajustar label del botón y mostrar/ocultar campo de tarjeta según metodo seleccionado
-    document.getElementById('metodoPago').addEventListener('change', (e)=>{
-      const btn = document.getElementById('enviar');
-      const cardSection = document.getElementById('card-section');
-      if (e.target.value === 'card') {
-        btn.value = 'Pagar con tarjeta';
-        if (cardSection) cardSection.style.display = 'none';
-        unmountCard();
-      } else if (e.target.value === 'efectivo') {
-        btn.value = 'Finalizar (Efectivo)';
-        if (cardSection) cardSection.style.display = 'block';
-        mountCard();
-      } else if (e.target.value === 'junaeb') {
-        btn.value = 'Finalizar (JUNAEB)';
-        if (cardSection) cardSection.style.display = 'block';
-        mountCard();
-      }
-    });
-
-    // Inicialización: cargar productos y crear modals por categoría
-    (async ()=>{
-      const products = await fetchProducts();
-      renderTabs(products);
-      const byCat = {};
-      products.forEach(p=>{ byCat[p.categoria]=byCat[p.categoria]||[]; byCat[p.categoria].push(p); });
-      Object.keys(byCat).forEach(cat=> createModal(cat, byCat[cat]));
-      updateCartUI();
-
-        // Comprobar si el servidor está conectado a la DB
-        try {
-          const _db = await fetch('/api/dbtest');
-          const _jd = await _db.json();
-          if (_jd && _jd.db) console.info('Servidor: conectado a DB (modo PostgreSQL)'); else console.info('Servidor: no conectado a DB (fallback JSON)');
-        } catch (e) { console.warn('No se pudo comprobar DB', e); }
-
-      // Inicializar Stripe en frontend (obtener publishable key del backend)
-      try {
-        const cfgRes = await fetch('/api/config');
-        if (cfgRes.ok) {
-          const cfg = await cfgRes.json();
-          publishableKey = cfg.publishableKey || '';
-          if (publishableKey) {
-            stripe = Stripe(publishableKey);
-            elements = stripe.elements();
-            // no montamos el cardElement hasta que el usuario elija retiro presencial
-          }
-        }
-      } catch (e) {
-        console.warn('No se pudo inicializar Stripe en frontend:', e);
-      }
-    })();
-
-    // pequeño helper de diagnóstico para imágenes (si existe un elemento con id diagList)
-    function checkImages(){
-      const diag = document.getElementById('diagList'); if (!diag) return;
-      diag.innerHTML=''; productos.forEach(p=>{ const row=document.createElement('div'); row.textContent=p.img+' — comprobando...'; const link=document.createElement('a'); link.href=p.img; link.target='_blank'; link.style.marginLeft='8px'; link.textContent='[abrir]'; row.appendChild(link); diag.appendChild(row); const img=new Image(); img.onload=()=>{ row.textContent=p.img+' — OK'; row.appendChild(link); }; img.onerror=()=>{ row.textContent=p.img+' — MISSING'; row.style.color='#b71c1c'; row.appendChild(link); }; img.src=p.img; });
-    }
-
-    // Animación de los iconos del fondo
-    const iconos = document.querySelectorAll('.fondo-animado .icono');
-    iconos.forEach(icono => {
-        // Posición horizontal aleatoria
-        icono.style.left = Math.random() * 100 + '%';
-
-        // Posición vertical inicial aleatoria para que ya estén cayendo
-        icono.style.top = -Math.random() * 100 + 'vh';
-
-        // Duración de la caída aleatoria (10 a 20 segundos)
-        const duracion = 10 + Math.random() * 10;
-        icono.style.animationDuration = duracion + 's';
-
-        // Retraso aleatorio (0 a 5 segundos)
-        icono.style.animationDelay = Math.random() * 5 + 's';
-    });
+    // init
+    (function init(){ renderCart(); fetchProducts(); })();
   </script>
 </body>
 
