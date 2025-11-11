@@ -27,6 +27,15 @@ try {
   nodemailer = null;
 }
 
+// Web Push (optional) - try to require web-push if installed
+let webpush = null;
+try {
+  webpush = require('web-push');
+} catch (e) {
+  console.warn('web-push no está instalado — Web Push estará deshabilitado. Para habilitar, npm install web-push');
+  webpush = null;
+}
+
 let bcrypt = null;
 try {
   bcrypt = require('bcrypt');
@@ -1050,6 +1059,22 @@ app.post('/api/pedidos/:id/notify', async (req, res) => {
     try {
       const info = await mailTransport.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: pedido.email, subject, text, html });
       const preview = nodemailer && nodemailer.getTestMessageUrl ? nodemailer.getTestMessageUrl(info) : null;
+      // Also attempt to send a Web Push notification to the user (if available)
+      try {
+        if (webpush && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+          try {
+            webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+            // Build payload
+            const payload = JSON.stringify({ title: '🎉 ¡Tu Pedido está Listo!', body: `El pedido #${pedido.id} ha sido completado y está listo para ser recogido.`, url: `/success.html?pedidoId=${pedido.id}` });
+            // Attempt to fetch subscription from DB/file and send (helper defined below)
+            await sendNotificationByUserId(pedido.email, payload);
+          } catch (wpErr) {
+            console.warn('WebPush send attempt failed:', wpErr && wpErr.message ? wpErr.message : wpErr);
+          }
+        }
+      } catch (e) {
+        console.warn('Error intentando enviar Web Push (silenciado):', e && e.message ? e.message : e);
+      }
       return res.json({ status: 'ok', messageId: info && info.messageId ? info.messageId : null, preview: preview });
     } catch (err) {
       console.error('Error sending notify email:', err && err.message ? err.message : err);
@@ -1058,6 +1083,135 @@ app.post('/api/pedidos/:id/notify', async (req, res) => {
   } catch (err) {
     console.error('Unexpected error in notify:', err);
     return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// --- Web Push helper functions and endpoints ---
+// Store subscriptions either in Postgres table `user_subscriptions` (user_id TEXT PRIMARY KEY, subscription JSON) or in a local file
+const SUBSCRIPTIONS_FILE = path.join(DATA_DIR, 'user_subscriptions.json');
+if (!fs.existsSync(SUBSCRIPTIONS_FILE)) fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify({}));
+
+async function saveSubscription(userId, subscription) {
+  const pool = app.locals.db;
+  if (pool) {
+    try {
+      // Try to create table if not exists (safe to run repeatedly)
+      await pool.query(`CREATE TABLE IF NOT EXISTS user_subscriptions (user_id TEXT PRIMARY KEY, subscription JSONB, created_at TIMESTAMP DEFAULT NOW())`);
+      await pool.query(`INSERT INTO user_subscriptions(user_id, subscription, created_at) VALUES($1,$2,NOW()) ON CONFLICT (user_id) DO UPDATE SET subscription = EXCLUDED.subscription, created_at = NOW()`, [String(userId), subscription]);
+      return true;
+    } catch (e) {
+      console.warn('saveSubscription DB failed, falling back to file:', e.message || e);
+    }
+  }
+  // fallback to file
+  try {
+    const raw = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf8');
+    const map = JSON.parse(raw || '{}');
+    map[String(userId)] = subscription;
+    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(map, null, 2));
+    return true;
+  } catch (e) {
+    console.error('saveSubscription file write failed:', e.message || e);
+    return false;
+  }
+}
+
+async function getSubscription(userId) {
+  const pool = app.locals.db;
+  if (pool) {
+    try {
+      const r = await pool.query('SELECT subscription FROM user_subscriptions WHERE user_id = $1 LIMIT 1', [String(userId)]);
+      if (r.rows && r.rows.length) return r.rows[0].subscription;
+    } catch (e) {
+      console.warn('getSubscription DB failed, falling back to file:', e.message || e);
+    }
+  }
+  try {
+    const raw = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf8');
+    const map = JSON.parse(raw || '{}');
+    return map[String(userId)] || null;
+  } catch (e) {
+    console.error('getSubscription file read failed:', e.message || e);
+    return null;
+  }
+}
+
+async function deleteSubscription(userId) {
+  const pool = app.locals.db;
+  if (pool) {
+    try {
+      await pool.query('DELETE FROM user_subscriptions WHERE user_id = $1', [String(userId)]);
+      return true;
+    } catch (e) {
+      console.warn('deleteSubscription DB failed, falling back to file:', e.message || e);
+    }
+  }
+  try {
+    const raw = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf8');
+    const map = JSON.parse(raw || '{}');
+    delete map[String(userId)];
+    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(map, null, 2));
+    return true;
+  } catch (e) {
+    console.error('deleteSubscription file write failed:', e.message || e);
+    return false;
+  }
+}
+
+async function sendNotificationByUserId(userId, payload) {
+  if (!webpush) throw new Error('web-push not available');
+  const sub = await getSubscription(userId);
+  if (!sub) throw new Error('No subscription for user');
+  try {
+    await webpush.sendNotification(sub, payload);
+    return true;
+  } catch (e) {
+    // if subscription is expired or invalid, remove it
+    const code = e && e.statusCode ? e.statusCode : null;
+    if (code === 410 || code === 404) {
+      await deleteSubscription(userId);
+    }
+    throw e;
+  }
+}
+
+// Endpoint to expose the VAPID public key to clients
+app.get('/api/vapidPublicKey', (req, res) => {
+  if (!process.env.VAPID_PUBLIC_KEY) return res.status(404).json({ error: 'VAPID_PUBLIC_KEY not set' });
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+// Save subscription
+app.post('/api/subscribe', async (req, res) => {
+  try {
+    const { user_id, subscription } = req.body || {};
+    if (!user_id || !subscription) return res.status(400).json({ error: 'user_id and subscription required' });
+    const ok = await saveSubscription(user_id, subscription);
+    if (!ok) return res.status(500).json({ error: 'Could not save subscription' });
+    return res.json({ status: 'ok' });
+  } catch (e) {
+    console.error('/api/subscribe error', e.message || e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Trigger send notification to a specific user (internal use)
+app.post('/api/send-notification/:user_id', async (req, res) => {
+  try {
+    if (!webpush || !process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return res.status(501).json({ error: 'WebPush not configured' });
+    const userId = req.params.user_id;
+    const payload = req.body && Object.keys(req.body).length ? JSON.stringify(req.body) : JSON.stringify({ title: 'Notificación', body: 'Tienes una notificación' });
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+    try {
+      await sendNotificationByUserId(userId, payload);
+      return res.json({ status: 'ok' });
+    } catch (e) {
+      console.error('Error sending notification to', userId, e && e.message ? e.message : e);
+      return res.status(500).json({ error: 'Error sending notification', detail: e && e.message ? e.message : String(e) });
+    }
+  } catch (e) {
+    console.error('/api/send-notification error', e && e.message ? e.message : e);
+    res.status(500).json({ error: 'Internal error' });
   }
 });
 

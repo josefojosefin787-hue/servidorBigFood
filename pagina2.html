@@ -65,6 +65,9 @@
       <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
       <div class="line"><input id="cliente" placeholder="Tu nombre" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
       <div class="line"><input id="email" placeholder="Correo electrónico" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
+      <div class="line" style="margin-top:6px">
+        <button id="subscribePushBtn" style="padding:8px 10px;border-radius:6px;border:1px solid #1a7841;background:#fff;color:#1a7841;cursor:pointer">Activar notificaciones</button>
+      </div>
       <div class="line"><textarea id="notaPedido" rows="2" placeholder="Notas (opcional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea></div>
       <div class="line">
         <select id="metodoPago" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
@@ -153,6 +156,55 @@
     // Banned modal
     function showBanned(token){ document.getElementById('bannedMessage').textContent = `Se detectó: "${token}". Cámbiala para continuar.`; document.getElementById('bannedModal').classList.add('active'); document.getElementById('bannedModal').setAttribute('aria-hidden','false'); }
     document.getElementById('bannedOk').addEventListener('click',()=>{ document.getElementById('bannedModal').classList.remove('active'); document.getElementById('bannedModal').setAttribute('aria-hidden','true'); });
+
+      // --- Service Worker & Push subscription helpers ---
+      function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      }
+
+      async function registerServiceWorker() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          alert('Notificaciones push no soportadas en este navegador');
+          return null;
+        }
+        try {
+          const reg = await navigator.serviceWorker.register('/service-worker.js');
+          return reg;
+        } catch (e) {
+          console.error('Error registrando service worker', e);
+          return null;
+        }
+      }
+
+      async function subscribeUser() {
+        const email = document.getElementById('email').value.trim();
+        if (!email) { alert('Ingresa tu correo en el campo para activar notificaciones'); return; }
+        const reg = await registerServiceWorker();
+        if (!reg) return;
+        try {
+          // fetch VAPID public key
+          const r = await fetch('/api/vapidPublicKey');
+          if (!r.ok) { alert('No está configurada la clave VAPID en el servidor'); return; }
+          const data = await r.json();
+          const vapidPublicKey = data.publicKey;
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
+          // send to server
+          const res = await fetch('/api/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ user_id: email, subscription: sub }) });
+          if (res.ok) { alert('Suscripción guardada. Te notificaremos cuando tu pedido esté listo.'); } else { const txt = await res.text(); alert('No se pudo guardar suscripción: '+txt); }
+        } catch (e) {
+          console.error('subscribeUser error', e);
+          alert('Error al suscribirse a notificaciones');
+        }
+      }
+
+      document.getElementById('subscribePushBtn').addEventListener('click', subscribeUser);
 
     // Checkout handler (basic: use create-checkout-session or create order)
     document.getElementById('procesar').addEventListener('click', async ()=>{
