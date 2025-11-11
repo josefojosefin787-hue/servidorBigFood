@@ -397,13 +397,6 @@
       Object.keys(byCat).forEach(cat=> createModal(cat, byCat[cat]));
       updateCartUI();
 
-        // Comprobar si el servidor está conectado a la DB
-        try {
-          const _db = await fetch('/api/dbtest');
-          const _jd = await _db.json();
-          if (_jd && _jd.db) console.info('Servidor: conectado a DB (modo PostgreSQL)'); else console.info('Servidor: no conectado a DB (fallback JSON)');
-        } catch (e) { console.warn('No se pudo comprobar DB', e); }
-
       // Inicializar Stripe en frontend (obtener publishable key del backend)
       try {
         const cfgRes = await fetch('/api/config');
