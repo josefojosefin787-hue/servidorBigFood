@@ -2,135 +2,6 @@
 <html lang="es">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Menú Cafetería - BigFood</title>
-  <link rel="stylesheet" href="styles.css">
-  <link href="https://fonts.googleapis.com/css2?family=Bowlby+One:wght@400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://js.stripe.com/v3/"></script>
-</head>
-
-<body>
-  <!-- Fondo animado: lluvia de comida de decoración -->
-  <div class="fondo-animado" aria-hidden="true">
-    <img src="/img/hamburguesa.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/hotdog.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/jugo.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/papas.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/pizza.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/hamburguesa.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/hotdog.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/jugo.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/papas.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/pizza.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/hamburguesa.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/hotdog.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/jugo.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/papas.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-    <img src="/img/pizza.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-  </div>
-
-  <!-- Contenedor principal: layout de dos columnas -->
-  <div class="page-layout">
-    
-    <!-- Sección izquierda: marca y menú de tema -->
-    <aside class="sidebar-left">
-      <div class="theme-switch-wrapper">
-        <label class="theme-switch" for="checkbox">
-          <input type="checkbox" id="checkbox" />
-          <div class="slider"></div>
-        </label>
-      </div>
-      
-      <div class="brand-section">
-        <h1 class="brand-title">Menú de la Cafetería</h1>
-        <h2 class="brand-logo">BigFood</h2>
-        <p class="brand-subtitle">Pide rápido y recoge en la cafetería</p>
-      </div>
-    </aside>
-
-    <!-- Sección derecha: contenido principal -->
-    <main class="content-area">
-      
-      <!-- Encabezado de categorías -->
-      <section class="category-header">
-        <h2 class="section-title">Selecciona una categoría</h2>
-      </section>
-
-      <!-- Grid de categorías -->
-      <div class="categories-grid" id="categoriaTabs" role="tablist" aria-label="Categorías de productos">
-        <button class="category-card" data-cat="bebidas" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/bebidas.jpg" alt="Bebidas" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Bebidas</span>
-        </button>
-        <button class="category-card" data-cat="postres" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/postres.jpg" alt="Postres" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Postres</span>
-        </button>
-        <button class="category-card" data-cat="comida rapida" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/comidaRapida.jpg" alt="Comida rápida" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Comida rápida</span>
-        </button>
-        <button class="category-card" data-cat="galletas" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/galletas.jpeg" alt="Galletas" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Galletas</span>
-        </button>
-        <button class="category-card" data-cat="chocolates" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/chocolates.jpg" alt="Chocolates" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Chocolates</span>
-        </button>
-        <button class="category-card" data-cat="confiteria" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/confites.jpeg" alt="Confitería" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Confitería</span>
-        </button>
-        <button class="category-card" data-cat="almuerzos" role="tab">
-          <div class="category-image-wrapper">
-            <img src="/img/almuerzos.jpg" alt="Almuerzos" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-          </div>
-          <span class="category-name">Almuerzos</span>
-        </button>
-      </div>
-
-      <!-- Área de contenido y carrito -->
-      <div class="layout-flex">
-        <section class="products-section" style="flex: 1;">
-          <!-- Los modales de productos se crearán dinámicamente aquí -->
-        </section>
-
-        <!-- Carrito lateral -->
-        <aside class="cart-sidebar" aria-label="Carrito de compras">
-          <div class="cart-container" id="carritoBox">
-            <h3 class="cart-title">Carrito de Compras</h3>
-            
-            <div class="cart-items" id="carritoItems" aria-live="polite">
-              <p class="empty-cart">Tu carrito está vacío</p>
-            </div>
-
-            <div class="cart-footer">
-              <div class="cart-total">
-                <span class="total-label">Total:</span>
-                <span class="total-amount">$<span id="total">0</span></span>
-              </div>
-
-              <div class="form-group">
-                <input id="cliente" class="form-input" placeholder="Nombre completo" aria-label="Nombre del cliente" />
-              </div>
-<!DOCTYPE html>
-<html lang="es">
-
-<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Menú - BigFood</title>
@@ -247,6 +118,7 @@
 
     // Banned tokens (same as server). Keep lower-case here.
     const BANNED_TOKENS = ['mierda','hijo de puta','puta madre','puta','cabron','fuck','shit','tula','pichula','weon','webon','conchetumare','conchetumadre','putito','pablo','brian','pene','culo','raja','tetita','milf','drop database','drop table','delete from','truncate','insert','update','alter table','exec ','union select','or 1=1','--','/**/'];
+
     const esc = s=>String(s).replace(/[\\^$.*+?()\[\]{}|]/g,'\\$&');
     function findBannedInText(text){ if(!text) return null; const t=String(text).toLowerCase(); for(const token of BANNED_TOKENS){ const tok=token.toLowerCase(); if(/^\w+$/.test(tok)){ const re=new RegExp('\\b'+esc(tok)+'\\b','i'); if(re.test(t)) return token;} else { if(t.indexOf(tok)!==-1) return token; } } return null; }
 
