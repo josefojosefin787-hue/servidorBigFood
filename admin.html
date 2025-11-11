@@ -137,8 +137,30 @@
 <body class="admin-page">
   <header class="admin-header">
     <div class="admin-header-content">
-      <h1>Panel de Administración</h1>
-      <p class="admin-subtitle">Gestión de productos — agrupar por categoría y editar</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <h1>Panel de Administración</h1>
+          <p class="admin-subtitle">Gestión de productos — agrupar por categoría y editar</p>
+        </div>
+        <div id="adminSessionPanel" style="text-align:right;min-width:220px;">
+          <!-- Filled by JS: admin name, email, privileges and logout -->
+          <div id="adminSessionContent" style="display:flex;align-items:center;gap:10px;justify-content:flex-end">
+            <img id="adminAvatar" src="" alt="avatar" style="width:44px;height:44px;border-radius:999px;display:none;object-fit:cover;border:2px solid rgba(255,255,255,0.6)">
+            <div style="text-align:left;min-width:140px;">
+              <div id="adminName" style="font-weight:700;color:#fff">Invitado</div>
+              <div id="adminEmail" style="font-size:0.85rem;color:#eef9f0">-</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div id="adminPrivileges" style="font-size:0.8rem;color:#eaf7ec">Privilegios: administrador</div>
+              <button id="btnLogout" class="admin-button" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.18);padding:6px 10px;border-radius:8px;">Cerrar sesión</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <nav style="margin-top:12px;display:flex;gap:10px;justify-content:center;">
+        <a href="/admin.html" style="padding:8px 14px;border-radius:10px;background:rgba(255,255,255,0.12);color:#fff;text-decoration:none;font-weight:600;">Productos</a>
+        <a href="/pedidos.html" style="padding:8px 14px;border-radius:10px;background:rgba(255,255,255,0.06);color:#fff;text-decoration:none;font-weight:600;">Pedidos</a>
+      </nav>
     </div>
   </header>
 
@@ -188,7 +210,34 @@
       }
       load();
       checkDbStatus();
+      ensureAdmin();
     });
+
+    async function ensureAdmin(){
+      try{
+        const r = await fetch('/api/admin/session', { credentials: 'same-origin' });
+        if (!r.ok) { window.location.href = '/admin-login.html'; return false; }
+        const j = await r.json();
+        if (!j || !j.admin) { window.location.href = '/admin-login.html'; return false; }
+        // populate session panel
+        const nameEl = document.getElementById('adminName');
+        const emailEl = document.getElementById('adminEmail');
+        const avatarEl = document.getElementById('adminAvatar');
+        const privEl = document.getElementById('adminPrivileges');
+        const logoutBtn = document.getElementById('btnLogout');
+        nameEl.textContent = j.admin.name || j.admin.email || 'Administrador';
+        emailEl.textContent = j.admin.email || '';
+        if (j.admin.picture) { avatarEl.src = j.admin.picture; avatarEl.style.display = 'block'; }
+        // privileges: allow DB lookup for roles if provided
+        if (j.admin.privileges) privEl.textContent = 'Privilegios: ' + j.admin.privileges;
+        else privEl.textContent = 'Privilegios: administrador';
+        logoutBtn.onclick = async ()=>{
+          await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
+          window.location.href = '/admin-login.html';
+        };
+        return true;
+      }catch(e){ console.warn('ensureAdmin error', e); window.location.href = '/admin-login.html'; return false; }
+    }
 
     async function checkDbStatus(){
       try{

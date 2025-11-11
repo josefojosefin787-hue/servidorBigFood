@@ -879,15 +879,67 @@ app.post('/admin/simulate-payment', async (req, res) => {
 });
 
 // Endpoint para actualizar estado (código sin cambios)
-app.patch('/api/pedidos/:id', (req, res) => {
+app.patch('/api/pedidos/:id', async (req, res) => {
   const id = Number(req.params.id);
-  const pedidos = leerPedidos();
-  const idx = pedidos.findIndex(p => p.id === id);
-  if (idx === -1) return res.status(404).json({ error: 'Pedido no encontrado' });
-  const update = req.body;
-  pedidos[idx] = { ...pedidos[idx], ...update };
-  guardarPedidos(pedidos);
-  res.json({ status: 'ok', pedido: pedidos[idx] });
+  const pool = app.locals.db;
+  const update = req.body || {};
+
+  // If we have a database pool, update the DB record so GET /api/pedidos returns the same state
+  if (pool) {
+    try {
+      const found = await pool.query('SELECT * FROM orders WHERE id = $1 LIMIT 1', [id]);
+      if (!found.rows.length) return res.status(404).json({ error: 'Pedido no encontrado' });
+      const row = found.rows[0];
+
+      // Determine new values (fall back to existing DB values when not provided)
+      const newStatus = update.estado || update.status || row.status;
+      const newCustomer = update.cliente || row.customer_name;
+      const newItems = typeof update.items !== 'undefined' ? update.items : row.items;
+      const newTotal = typeof update.total !== 'undefined' ? update.total : row.total;
+      const existingMetadata = row.metadata || {};
+      const metadataUpdate = Object.assign({}, existingMetadata);
+      if (typeof update.email !== 'undefined') metadataUpdate.email = update.email;
+      if (typeof update.metodoPago !== 'undefined') metadataUpdate.metodoPago = update.metodoPago;
+      if (typeof update.nota !== 'undefined') metadataUpdate.nota = update.nota;
+      if (typeof update.paymentIntentId !== 'undefined') metadataUpdate.paymentIntentId = update.paymentIntentId;
+      if (typeof update.sessionId !== 'undefined') metadataUpdate.sessionId = update.sessionId;
+
+      const sql = `UPDATE orders SET status = $1, customer_name = $2, items = $3, total = $4, metadata = $5 WHERE id = $6 RETURNING *`;
+      const params = [newStatus, newCustomer, newItems, newTotal, metadataUpdate, id];
+      const r = await pool.query(sql, params);
+      const row2 = r.rows[0];
+      const pedido = {
+        id: row2.id,
+        cliente: row2.customer_name,
+        email: row2.metadata && row2.metadata.email ? row2.metadata.email : null,
+        items: row2.items,
+        total: Number(row2.total),
+        metodoPago: row2.metadata && row2.metadata.metodoPago ? row2.metadata.metodoPago : null,
+        nota: row2.metadata && row2.metadata.nota ? row2.metadata.nota : null,
+        estado: row2.status,
+        paymentIntentId: row2.metadata && row2.metadata.paymentIntentId ? row2.metadata.paymentIntentId : null,
+        sessionId: row2.external_id || (row2.metadata && row2.metadata.sessionId ? row2.metadata.sessionId : null),
+        fecha: row2.created_at
+      };
+      return res.json({ status: 'ok', pedido });
+    } catch (err) {
+      console.error('[API] Error actualizando pedido en DB:', err && err.message ? err.message : err);
+      return res.status(500).json({ error: 'Error actualizando pedido en DB' });
+    }
+  }
+
+  // Fallback to JSON file if no DB pool
+  try {
+    const pedidos = leerPedidos();
+    const idx = pedidos.findIndex(p => p.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Pedido no encontrado' });
+    pedidos[idx] = { ...pedidos[idx], ...update };
+    guardarPedidos(pedidos);
+    res.json({ status: 'ok', pedido: pedidos[idx] });
+  } catch (e) {
+    console.error('[API] Error actualizando pedido (fallback):', e);
+    res.status(500).json({ error: 'Error actualizando pedido' });
+  }
 });
 
 // Endpoint para notificar por correo que un pedido está listo
