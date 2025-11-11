@@ -1,4 +1,4 @@
-i<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 
 <head>
@@ -341,8 +341,8 @@ i<!DOCTYPE html>
         });
     </script>
     
-    // --- Additional scripts (theme toggle + animated icons) ---
-    // Merged into the single script block so the document structure is valid.
+    <!-- Additional scripts (theme toggle + animated icons) -->
+    <script>
     (function(){
         // Control del tema oscuro
         const toggleSwitch = document.querySelector('#checkbox');
@@ -378,7 +378,109 @@ i<!DOCTYPE html>
         });
     })();
 
-</body>
+        </script>
+
+        <!-- Modal para palabra baneada -->
+        <style>
+            #bannedModal{position:fixed;left:0;top:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);z-index:9999}
+            #bannedModal .modal-box{background:white;padding:20px;border-radius:8px;max-width:420px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+            #bannedModal .modal-box h3{margin:0 0 8px;font-size:1.1rem}
+            #bannedModal .modal-box p{margin:0 0 12px;color:#333}
+            #bannedModal .modal-actions{text-align:right}
+            #bannedModal .modal-actions button{margin-left:8px;padding:8px 12px;border-radius:6px;border:0;cursor:pointer}
+            #bannedModal .btn-ok{background:#18944c;color:#fff}
+            #bannedModal .btn-edit{background:#e0e0e0}
+        </style>
+
+        <div id="bannedModal" aria-hidden="true">
+            <div class="modal-box" role="dialog" aria-modal="true">
+                <h3>Palabra indebida detectada</h3>
+                <p id="bannedMessage">Se ha detectado una palabra o frase no permitida. Por favor cámbiala para continuar.</p>
+                <div class="modal-actions">
+                    <button class="btn-edit" id="bannedEdit">Editar</button>
+                    <button class="btn-ok" id="bannedOk">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Lista cliente de tokens prohibidos (coincide con el servidor). Mantener en minúsculas.
+            const BANNED_TOKENS = [
+                'mierda','hijo de puta','puta madre','puta','cabron','fuck','shit','tula','pichula','weon','webon','conchetumare','conchetumadre','putito','pablo','brian','pene','culo','raja','tetita','milf',
+                'drop database','drop table','delete from','truncate','insert','update','alter table','exec ','union select','or 1=1','--','/**/'
+            ];
+
+            // Escapar regex
+            const esc = s => String(s).replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
+
+            // Build checks that handle words/phrases: for tokens that are pure word chars, use \b boundaries, otherwise simple contains
+            function findBannedInText(text){
+                if(!text) return null;
+                const t = String(text).toLowerCase();
+                for(const token of BANNED_TOKENS){
+                    const tok = token.toLowerCase();
+                    // if token contains only letters/numbers/underscore, use word boundary
+                    if(/^\w+$/.test(tok)){
+                        const re = new RegExp('\\b'+esc(tok)+'\\b','i');
+                        if(re.test(t)) return token;
+                    } else {
+                        if(t.indexOf(tok) !== -1) return token;
+                    }
+                }
+                return null;
+            }
+
+            // Modal helpers
+            const bannedModal = document.getElementById('bannedModal');
+            const bannedMessage = document.getElementById('bannedMessage');
+            const bannedOk = document.getElementById('bannedOk');
+            const bannedEdit = document.getElementById('bannedEdit');
+            let lastOffendingInput = null;
+
+            function showBannedModal(token, inputEl){
+                bannedMessage.textContent = `Se ha detectado: "${token}". Por favor cámbialo para continuar.`;
+                lastOffendingInput = inputEl || null;
+                bannedModal.style.display = 'flex';
+                bannedModal.setAttribute('aria-hidden','false');
+            }
+            function hideBannedModal(){
+                bannedModal.style.display = 'none';
+                bannedModal.setAttribute('aria-hidden','true');
+                if(lastOffendingInput) lastOffendingInput.focus();
+            }
+
+            bannedOk.addEventListener('click', hideBannedModal);
+            bannedEdit.addEventListener('click', hideBannedModal);
+
+            // Intercept form submissions and validate inputs
+            function bindFormValidation(form){
+                if(!form) return;
+                form.addEventListener('submit', function(e){
+                    // collect all text-like fields
+                    const inputs = Array.from(form.querySelectorAll('input,textarea,select')).filter(el=>el.type!=='hidden' && !el.disabled);
+                    for(const inp of inputs){
+                        const val = inp.value;
+                        const found = findBannedInText(val);
+                        if(found){
+                            e.preventDefault();
+                            showBannedModal(found, inp);
+                            return false;
+                        }
+                    }
+                    // allow submit
+                }, {capture:true});
+            }
+
+            // Bind to the main login/contact forms on this page
+            document.addEventListener('DOMContentLoaded', function(){
+                const loginForm = document.querySelector('.cont-formulario');
+                const contactForm = document.getElementById('contactForm');
+                bindFormValidation(loginForm);
+                bindFormValidation(contactForm);
+            });
+        </script>
+
+        </body>
 
 </html>
 
