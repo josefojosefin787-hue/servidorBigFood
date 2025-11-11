@@ -3,141 +3,179 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Menú Cafetería - Pedido</title>
-  <link rel="stylesheet" href="/styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Menú Cafetería - BigFood</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bowlby+One:wght@400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://js.stripe.com/v3/"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap" rel="stylesheet">
-  
 </head>
 
 <body>
-  <div class="fondo-animado">
-  <img src="/img/hamburguesa.png" class="icono comida1">
-  <img src="/img/hotdog.png" class="icono comida2">
-  <img src="/img/jugo.png" class="icono comida3">
-  <img src="/img/papas.png" class="icono comida4">
-  <img src="/img/pizza.png" class="icono comida5">
-
-    <img src="img/hamburguesa.png" class="icono comida1">
-    <img src="img/hotdog.png" class="icono comida2">
-    <img src="img/jugo.png" class="icono comida3">
-    <img src="img/papas.png" class="icono comida4">
-    <img src="img/pizza.png" class="icono comida5">
-
-    <img src="img/hamburguesa.png" class="icono comida1">
-    <img src="img/hotdog.png" class="icono comida2">
-    <img src="img/jugo.png" class="icono comida3">
-    <img src="img/papas.png" class="icono comida4">
-    <img src="img/pizza.png" class="icono comida5">
-
-    <img src="img/hamburguesa.png" class="icono comida1">
-    <img src="img/hotdog.png" class="icono comida2">
-    <img src="img/jugo.png" class="icono comida3">
-    <img src="img/papas.png" class="icono comida4">
-    <img src="img/pizza.png" class="icono comida5">
-
-    <img src="img/hamburguesa.png" class="icono comida1">
-    <img src="img/hotdog.png" class="icono comida2">
-    <img src="img/jugo.png" class="icono comida3">
-    <img src="img/papas.png" class="icono comida4">
-    <img src="img/pizza.png" class="icono comida5">
-  </div>
-  <div class="lado-izquierdo">
-    <div class="theme-switch-wrapper">
-      <label class="theme-switch" for="checkbox">
-        <input type="checkbox" id="checkbox" />
-        <div class="slider"></div>
-      </label>
-    </div>
-    <div class="contenedor-titulo">
-      <h1 class="titulo">Menú de la Cafetería</h1>
-      <h2 class="titulo2">BigFood</h2>
-    </div>
+  <!-- Fondo animado: lluvia de comida de decoración -->
+  <div class="fondo-animado" aria-hidden="true">
+    <img src="/img/hamburguesa.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/hotdog.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/jugo.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/papas.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/pizza.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/hamburguesa.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/hotdog.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/jugo.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/papas.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/pizza.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/hamburguesa.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/hotdog.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/jugo.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/papas.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+    <img src="/img/pizza.png" class="icono" alt="" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
   </div>
 
-  <div class="lado-derecho">
-    <div class="contenedor">
-  <h2 class="seleccion">Selecciona una categoría</h2>
-
-    <div class="tabs" id="categoriaTabs">
-      <button class="tab" data-cat="bebidas">
-        <img src="/img/bebidas.jpg" alt="Bebidas">
-        <span>Bebidas</span>
-      </button>
-      <button class="tab" data-cat="postres">
-        <img src="/img/postres.jpg" alt="Postres">
-        <span>Postres</span>
-      </button>
-      <button class="tab" data-cat="comida rapida">
-        <img src="/img/comidaRapida.jpg" alt="Comida rápida">
-        <span>Comida rápida</span>
-      </button>
-      <button class="tab" data-cat="galletas">
-        <img src="/img/galletas.jpeg" alt="Galletas">
-        <span>Galletas</span>
-      </button>
-      <button class="tab" data-cat="chocolates">
-        <img src="/img/chocolates.jpg" alt="Chocolates">
-        <span>Chocolates</span>
-      </button>
-      <button class="tab" data-cat="confiteria">
-        <img src="/img/confites.jpeg" alt="Confitería">
-        <span>Confitería</span>
-      </button>
-      <button class="tab" data-cat="almuerzos">
-        <img src="/img/almuerzos.jpg" alt="Almuerzos">
-        <span>Almuerzos</span>
-      </button>
-    </div>
-
-  <main class="main-layout">
+  <!-- Contenedor principal: layout de dos columnas -->
+  <div class="page-layout">
+    
+    <!-- Sección izquierda: marca y menú de tema -->
+    <aside class="sidebar-left">
+      <div class="theme-switch-wrapper">
+        <label class="theme-switch" for="checkbox">
+          <input type="checkbox" id="checkbox" />
+          <div class="slider"></div>
+        </label>
+      </div>
       
-  
-      
+      <div class="brand-section">
+        <h1 class="brand-title">Menú de la Cafetería</h1>
+        <h2 class="brand-logo">BigFood</h2>
+        <p class="brand-subtitle">Pide rápido y recoge en la cafetería</p>
+      </div>
+    </aside>
 
-  <aside class="aside-cart">
-        <div class="carrito" id="carritoBox">
-          <h3 style="color:#139147;">Carrito</h3>
-          <div id="carritoItems"></div>
-          <div><strong>Total: $<span id="total">0</span></strong></div>
-          <input id="cliente" class="input" placeholder="Tu nombre" />
-          <input id="email" class="input" placeholder="Correo electrónico (recibirás el comprobante)" />
-          <textarea id="notaPedido" class="input" placeholder="Notas del pedido (opcional)" rows="3"></textarea>
-          <label for="metodoPago" style="display:block;margin:8px 0 4px 0;font-weight:600">Método de pago</label>
-          <select id="metodoPago" class="input">
-            <option value="card">Tarjeta (online)</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="junaeb">JUNAEB</option>
-          </select>
-          <!-- Sección para tarjeta de garantía (solo visible si el cliente elige pago presencial) -->
-          <div id="card-section" style="display:none;margin-top:8px;">
-            <label style="font-weight:600">Tarjeta de garantía (no se cobrará ahora)</label>
-            <div id="card-element" style="padding:12px;border:1px solid #ddd;border-radius:6px;background:#fff;margin-top:6px;"></div>
-            <div id="card-errors" role="alert" style="color:#b71c1c;margin-top:6px;"></div>
+    <!-- Sección derecha: contenido principal -->
+    <main class="content-area">
+      
+      <!-- Encabezado de categorías -->
+      <section class="category-header">
+        <h2 class="section-title">Selecciona una categoría</h2>
+      </section>
+
+      <!-- Grid de categorías -->
+      <div class="categories-grid" id="categoriaTabs" role="tablist" aria-label="Categorías de productos">
+        <button class="category-card" data-cat="bebidas" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/bebidas.jpg" alt="Bebidas" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
           </div>
-          <input id="enviar" type="button" class="enviar" value="Pagar con tarjeta" />
-        </div>
-      </aside>
+          <span class="category-name">Bebidas</span>
+        </button>
+        <button class="category-card" data-cat="postres" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/postres.jpg" alt="Postres" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+          </div>
+          <span class="category-name">Postres</span>
+        </button>
+        <button class="category-card" data-cat="comida rapida" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/comidaRapida.jpg" alt="Comida rápida" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+          </div>
+          <span class="category-name">Comida rápida</span>
+        </button>
+        <button class="category-card" data-cat="galletas" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/galletas.jpeg" alt="Galletas" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+          </div>
+          <span class="category-name">Galletas</span>
+        </button>
+        <button class="category-card" data-cat="chocolates" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/chocolates.jpg" alt="Chocolates" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+          </div>
+          <span class="category-name">Chocolates</span>
+        </button>
+        <button class="category-card" data-cat="confiteria" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/confites.jpeg" alt="Confitería" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+          </div>
+          <span class="category-name">Confitería</span>
+        </button>
+        <button class="category-card" data-cat="almuerzos" role="tab">
+          <div class="category-image-wrapper">
+            <img src="/img/almuerzos.jpg" alt="Almuerzos" loading="lazy" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+          </div>
+          <span class="category-name">Almuerzos</span>
+        </button>
+      </div>
+
+      <!-- Área de contenido y carrito -->
+      <div class="layout-flex">
+        <section class="products-section" style="flex: 1;">
+          <!-- Los modales de productos se crearán dinámicamente aquí -->
+        </section>
+
+        <!-- Carrito lateral -->
+        <aside class="cart-sidebar" aria-label="Carrito de compras">
+          <div class="cart-container" id="carritoBox">
+            <h3 class="cart-title">Carrito de Compras</h3>
+            
+            <div class="cart-items" id="carritoItems" aria-live="polite">
+              <p class="empty-cart">Tu carrito está vacío</p>
+            </div>
+
+            <div class="cart-footer">
+              <div class="cart-total">
+                <span class="total-label">Total:</span>
+                <span class="total-amount">$<span id="total">0</span></span>
+              </div>
+
+              <div class="form-group">
+                <input id="cliente" class="form-input" placeholder="Nombre completo" aria-label="Nombre del cliente" />
+              </div>
+
+              <div class="form-group">
+                <input id="email" class="form-input" placeholder="Correo electrónico" aria-label="Correo electrónico" />
+              </div>
+
+              <div class="form-group">
+                <textarea id="notaPedido" class="form-input" placeholder="Notas del pedido (opcional)" rows="3" aria-label="Notas del pedido"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="metodoPago" class="form-label">Método de pago</label>
+                <select id="metodoPago" class="form-input" aria-label="Método de pago">
+                  <option value="card">Tarjeta (online)</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="junaeb">JUNAEB</option>
+                </select>
+              </div>
+
+              <div id="card-section" class="card-section" style="display: none;">
+                <label class="form-label">Tarjeta de garantía</label>
+                <div id="card-element" class="stripe-element"></div>
+                <div id="card-errors" class="error-message" role="alert"></div>
+              </div>
+
+              <button id="enviar" class="btn-submit" type="button">Procesar Pedido</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
     </main>
-    </div>
   </div>
 
     <div class="menu-content">
-    <span class="menu-item" id="menu" title="Más">
-      <img src="/svg/plus.svg" alt="Más">
+    <span class="menu-item" id="menu" title="Menú de redes sociales" role="button" tabindex="0">
+      <img src="svg/plus.svg" alt="Menú">
     </span>
-    <a href="#" target="_blank" class="menu-item" title="Facebook">
-      <img src="/svg/facebook.svg" alt="Facebook">
+    <a href="https://web.facebook.com/martita.lebu" target="_blank" class="menu-item" title="Síguenos en Facebook" aria-label="Facebook">
+      <img src="svg/facebook.svg" alt="Facebook">
     </a>
-    <a href="#" target="_blank" class="menu-item" title="Instagram">
-      <img src="/svg/instagram.svg" alt="Instagram">
+    <a href="https://www.instagram.com/pasteleriamartitalebu/" target="_blank" class="menu-item" title="Síguenos en Instagram" aria-label="Instagram">
+      <img src="svg/instagram.svg" alt="Instagram">
     </a>
-    <a href="#" target="_blank" class="menu-item" title="Youtube">
-      <img src="/svg/youtube.svg" alt="Youtube">
+    <a href="#" target="_blank" class="menu-item" title="Síguenos en Youtube" aria-label="Youtube">
+      <img src="svg/youtube.svg" alt="Youtube">
     </a>
   </div>
-
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="scripts/input_filter.js"></script>
   <script>
     // === CONTROL DE TEMA OSCURO ===
     const toggleSwitch = document.querySelector('#checkbox');
@@ -169,8 +207,9 @@
     });
 
     // Base para las rutas de imagen
-    const IMAGES_BASE = (window.location.protocol === 'file:') ? './imagenes' : '/imagenes';
-    const PLACEHOLDER = IMAGES_BASE + '/placeholder.svg';
+  // Rutas base de imágenes; se asume carpeta local `img/` en producción
+  const IMAGES_BASE = '/img';
+  const PLACEHOLDER = IMAGES_BASE + '/placeholder.svg';
 
   let productos = [];
   // Iniciamos carrito leyendo lo que haya en localStorage (no sobrescribimos)
@@ -357,16 +396,14 @@
           const res = await fetch('/api/pedidos', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: carrito, nota: notaPedido, metodoPago: metodo }) });
           const data = await res.json();
           if (data && data.pedido && data.pedido.id) {
-            try { localStorage.setItem('ultimoCliente', cliente); } catch(e) {}
-            try { localStorage.removeItem('cart'); } catch(e) {}
-            carrito = [];
-            try { updateCartUI(); } catch(e) {}
+            try { localStorage.setItem('ultimoCliente', cliente); } catch(e){}
+            try { localStorage.removeItem('cart'); } catch(e){}
             window.location.href = `/success.html?pedidoId=${data.pedido.id}`;
           } else {
             alert('No se pudo crear el pedido'); console.error(data);
           }
         }
-      }catch(e){ alert('Error conectando con el servidor: '+e.message); }
+      } catch (e) { alert('Error conectando con el servidor: ' + e.message); }
     });
 
     // ajustar label del botón y mostrar/ocultar campo de tarjeta según metodo seleccionado
@@ -396,6 +433,13 @@
       products.forEach(p=>{ byCat[p.categoria]=byCat[p.categoria]||[]; byCat[p.categoria].push(p); });
       Object.keys(byCat).forEach(cat=> createModal(cat, byCat[cat]));
       updateCartUI();
+
+        // Comprobar si el servidor está conectado a la DB
+        try {
+          const _db = await fetch('/api/dbtest');
+          const _jd = await _db.json();
+          if (_jd && _jd.db) console.info('Servidor: conectado a DB (modo PostgreSQL)'); else console.info('Servidor: no conectado a DB (fallback JSON)');
+        } catch (e) { console.warn('No se pudo comprobar DB', e); }
 
       // Inicializar Stripe en frontend (obtener publishable key del backend)
       try {
