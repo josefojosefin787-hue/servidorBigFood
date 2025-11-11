@@ -62,6 +62,50 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Limpia el localStorage para evitar mostrar el mismo voucher en el futuro y vaciar el carrito
     try { localStorage.removeItem('ultimoCliente'); } catch (e) { /* ignore */ }
     try { localStorage.removeItem('cart'); } catch (e) { /* ignore */ }
+    // --- Polling para notificaciones en el navegador del cliente ---
+    (function watchPedido(p) {
+      const id = p.id;
+      let seenListo = p.estado && String(p.estado).toLowerCase().includes('listo');
+
+      async function check() {
+        try {
+          const r = await fetch('/api/pedidos/' + encodeURIComponent(id));
+          if (!r.ok) return;
+          const remote = await r.json();
+          const estado = remote && remote.estado ? String(remote.estado) : '';
+          if (!seenListo && estado.toLowerCase().includes('listo')) {
+            seenListo = true;
+            // show browser notification if permission
+            if (window.Notification) {
+              if (Notification.permission === 'granted') {
+                new Notification('Pedido listo', { body: `Tu pedido #${id} está listo para retiro.` });
+              } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then(perm => {
+                  if (perm === 'granted') new Notification('Pedido listo', { body: `Tu pedido #${id} está listo para retiro.` });
+                }).catch(()=>{});
+              }
+            }
+            // also display inline message
+            try{
+              const v = document.getElementById('voucher');
+              if (v) {
+                const el = document.createElement('div');
+                el.style.padding = '12px'; el.style.borderRadius='8px'; el.style.marginTop='12px'; el.style.background='#d1e7dd'; el.style.color='#0f5132';
+                el.innerText = `Notificación: Tu pedido #${id} está listo para retiro.`;
+                v.prepend(el);
+              }
+            }catch(e){}
+          }
+        } catch (e) { /* ignore transient errors */ }
+      }
+
+      // Start periodic checks (5s) while page open
+      const timer = setInterval(check, 5000);
+      // initial delayed check
+      setTimeout(check, 1500);
+      // stop when user navigates away
+      window.addEventListener('beforeunload', ()=> clearInterval(timer));
+    })(pedido);
   } catch (e) {
     voucherDiv.innerHTML = '<p>Error al cargar el voucher.</p>';
   }

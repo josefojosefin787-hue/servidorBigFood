@@ -890,6 +890,59 @@ app.patch('/api/pedidos/:id', (req, res) => {
   res.json({ status: 'ok', pedido: pedidos[idx] });
 });
 
+// Endpoint para notificar por correo que un pedido está listo
+app.post('/api/pedidos/:id/notify', async (req, res) => {
+  const id = Number(req.params.id);
+  const pool = app.locals.db;
+  let pedido = null;
+  try {
+    if (pool) {
+      try {
+        const r = await pool.query('SELECT * FROM orders WHERE id = $1 LIMIT 1', [id]);
+        if (r.rows && r.rows.length) {
+          const row = r.rows[0];
+          pedido = {
+            id: row.id,
+            cliente: row.customer_name,
+            email: row.metadata && row.metadata.email ? row.metadata.email : null,
+            estado: row.status
+          };
+        }
+      } catch (e) {
+        // ignore DB lookup error and fallback to file
+        console.error('Error DB lookup for notify:', e.message || e);
+      }
+    }
+    if (!pedido) {
+      const pedidos = leerPedidos();
+      const found = pedidos.find(p => Number(p.id) === id);
+      if (found) pedido = found;
+    }
+
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+    if (!pedido.email) return res.status(400).json({ error: 'Pedido no tiene email asociado' });
+
+    if (!mailTransport) return res.status(503).json({ error: 'Servicio de correo no disponible' });
+
+    const subject = `Tu pedido #${pedido.id} está listo`;
+    const text = `Hola ${pedido.cliente || ''},\n\nTu pedido #${pedido.id} ya está listo para retiro.\n\nSaludos,\nEl equipo de la cafetería`;
+    const html = `<p>Hola ${pedido.cliente || ''},</p><p>Tu pedido <strong>#${pedido.id}</strong> ya está <strong>listo</strong> para retiro.</p><p>Saludos,<br/>Equipo de la cafetería</p>`;
+
+    try {
+      const info = await mailTransport.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: pedido.email, subject, text, html });
+      const preview = nodemailer && nodemailer.getTestMessageUrl ? nodemailer.getTestMessageUrl(info) : null;
+      return res.json({ status: 'ok', messageId: info && info.messageId ? info.messageId : null, preview: preview });
+    } catch (err) {
+      console.error('Error sending notify email:', err && err.message ? err.message : err);
+      return res.status(500).json({ error: 'Error enviando correo' });
+    }
+  } catch (err) {
+    console.error('Unexpected error in notify:', err);
+    return res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // === NUEVO ENDPOINT PARA ARCHIVAR Y LIMPIAR PEDIDOS ===
 app.post('/api/pedidos/archivar', (req, res) => {
   const resultado = archivarYLimpiarPedidos();
