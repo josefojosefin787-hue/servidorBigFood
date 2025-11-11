@@ -191,16 +191,36 @@
         try {
           // fetch VAPID public key
           const r = await fetch('/api/vapidPublicKey');
-          if (!r.ok) { alert('No está configurada la clave VAPID en el servidor'); return; }
+          if (!r.ok) {
+            const txt = await r.text().catch(() => '');
+            console.error('/api/vapidPublicKey error', r.status, txt);
+            alert('No está configurada la clave VAPID en el servidor (ver consola)');
+            return;
+          }
           const data = await r.json();
           const vapidPublicKey = data.publicKey;
+          if (!vapidPublicKey) {
+            console.error('vapidPublicKey missing in response', data);
+            alert('La clave VAPID pública no está disponible (ver consola)');
+            return;
+          }
+          // subscribe (applicationServerKey must be Uint8Array)
           const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
-          // send to server
-          const res = await fetch('/api/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ user_id: email, subscription: sub }) });
-          if (res.ok) { alert('Suscripción guardada. Te notificaremos cuando tu pedido esté listo.'); } else { const txt = await res.text(); alert('No se pudo guardar suscripción: '+txt); }
+          const subObj = (typeof sub.toJSON === 'function') ? sub.toJSON() : sub;
+          console.log('Push subscription created', subObj);
+
+          // send to server (send a plain JSON object)
+          const res = await fetch('/api/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ user_id: email, subscription: subObj }) });
+          if (res.ok) {
+            alert('Suscripción guardada. Te notificaremos cuando tu pedido esté listo.');
+          } else {
+            const txt = await res.text().catch(()=>null);
+            console.error('/api/subscribe failed', res.status, txt);
+            alert('No se pudo guardar suscripción (ver consola para más detalles)');
+          }
         } catch (e) {
-          console.error('subscribeUser error', e);
-          alert('Error al suscribirse a notificaciones');
+          console.error('subscribeUser error', e && e.stack ? e.stack : e);
+          alert('Error al suscribirse a notificaciones: ' + (e && e.message ? e.message : String(e)));
         }
       }
 

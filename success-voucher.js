@@ -43,23 +43,93 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     if (!pedido) {
       // Mostrar mensaje más útil y log de diagnóstico
-      voucherDiv.innerHTML = `<div class="cont-formulario" style="max-width:400px;margin:0 auto;"><h2 class="titulo2">No se encontró información del pedido</h2><p>Intenté buscar por:</p><ul><li>pedidoId: ${pedidoId || 'n/a'}</li><li>sessionId: ${sid || 'n/a'}</li><li>cliente(localStorage): ${cliente || 'n/a'}</li></ul><p>Si acabas de pagar con Stripe, espera unos segundos o revisa la consola del servidor (webhook). Si el problema persiste, pega aquí los logs de la consola del navegador y del servidor.</p></div>`;
+      voucherDiv.innerHTML = `
+        <div class="error-section">
+          <h2 style="margin-top:0">No se encontró información del pedido</h2>
+          <p>Intenté buscar por:</p>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            <li><strong>Pedido ID:</strong> ${pedidoId || 'no disponible'}</li>
+            <li><strong>Sesión ID:</strong> ${sid || 'no disponible'}</li>
+            <li><strong>Cliente:</strong> ${cliente || 'no disponible'}</li>
+          </ul>
+          <p style="margin-bottom:0;"><strong>Sugerencias:</strong></p>
+          <ul style="margin: 10px 0; padding-left: 20px;">
+            <li>Si acabas de pagar con Stripe, espera 5-10 segundos</li>
+            <li>Intenta recargar la página (F5)</li>
+            <li>Si el problema persiste, contacta al soporte</li>
+          </ul>
+        </div>
+      `;
       console.warn('[voucher] pedido no encontrado. params:', { pedidoId, sessionId: sid, cliente });
       return;
     }
-    let itemsHtml = pedido.items.map(it => `<li>${it.cantidad} x ${it.nombre} - $${it.precio * it.cantidad}</li>`).join('');
+
+    // Generar HTML del voucher con estilos empresariales
+    let itemsHtml = pedido.items.map(it => `
+      <div class="item-row">
+        <span><span class="item-qty">${it.cantidad}x</span> ${it.nombre}</span>
+        <span class="item-price">$${it.precio * it.cantidad}</span>
+      </div>
+    `).join('');
+
+    const fechaFormato = new Date(pedido.fecha).toLocaleDateString('es-CL', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const statusClass = pedido.estado && String(pedido.estado).toLowerCase().includes('listo') ? '' : 'pending';
+    const statusText = pedido.estado || 'Pendiente';
+    const statusIcon = statusClass === 'pending' ? '⏳' : '✓';
+
     voucherDiv.innerHTML = `
-      <div class="cont-formulario" style="max-width:400px;margin:0 auto;">
-        <h2 class="titulo2">Voucher de Pago</h2>
-        <p><strong>Pedido #:</strong> ${pedido.id || 'n/a'}</p>
-        <p><strong>Cliente:</strong> ${pedido.cliente}</p>
-        <p><strong>Fecha:</strong> ${new Date(pedido.fecha).toLocaleString()}</p>
-        <ul style="text-align:left;">${itemsHtml}</ul>
-        <p><strong>Total pagado:</strong> $${pedido.total}</p>
-        <p style="color:#18944c;font-weight:bold;">Estado: ${pedido.estado}</p>
+      <div class="voucher-section">
+        <h2 class="voucher-title">📋 Detalle del Pedido</h2>
+        
+        <div class="voucher-info">
+          <div class="voucher-field">
+            <div class="voucher-label">🔢 Número de Pedido</div>
+            <div class="voucher-value">#${pedido.id || 'n/a'}</div>
+          </div>
+          <div class="voucher-field">
+            <div class="voucher-label">📅 Fecha y Hora</div>
+            <div class="voucher-value">${fechaFormato}</div>
+          </div>
+          <div class="voucher-field">
+            <div class="voucher-label">👤 Cliente</div>
+            <div class="voucher-value">${pedido.cliente}</div>
+          </div>
+          <div class="voucher-field">
+            <div class="voucher-label">✉️ Correo</div>
+            <div class="voucher-value">${pedido.email}</div>
+          </div>
+        </div>
+
+        <!-- Items pedidos -->
+        <div class="voucher-items">
+          <div class="items-title">🛒 Artículos Pedidos</div>
+          ${itemsHtml}
+        </div>
+
+        <!-- Total -->
+        <div class="total-row">
+          <span>💰 Total Pagado:</span>
+          <span>$${pedido.total}</span>
+        </div>
+
+        <!-- Estado del pedido -->
+        <div class="status-section ${statusClass}">
+          <span style="font-size: 1.4rem; margin-right: 10px;">${statusIcon}</span>
+          <strong>Estado: ${statusText}</strong>
+        </div>
+
+        ${pedido.nota ? `<p style="text-align: left; color: #666; font-size: 0.9rem; margin-top: 15px; padding: 12px; background: #f9f9f9; border-left: 3px solid #ffc107; border-radius: 4px;"><strong>📝 Notas:</strong> ${pedido.nota}</p>` : ''}
       </div>
     `;
-    // Limpia el localStorage para evitar mostrar el mismo voucher en el futuro y vaciar el carrito
+
+    // Limpia el localStorage para evitar mostrar el mismo voucher en el futuro
     try { localStorage.removeItem('ultimoCliente'); } catch (e) { /* ignore */ }
     try { localStorage.removeItem('cart'); } catch (e) { /* ignore */ }
     // --- Polling para notificaciones en el navegador del cliente ---
@@ -90,8 +160,15 @@ window.addEventListener('DOMContentLoaded', async () => {
               const v = document.getElementById('voucher');
               if (v) {
                 const el = document.createElement('div');
-                el.style.padding = '12px'; el.style.borderRadius='8px'; el.style.marginTop='12px'; el.style.background='#d1e7dd'; el.style.color='#0f5132';
-                el.innerText = `Notificación: Tu pedido #${id} está listo para retiro.`;
+                el.className = 'notification-banner status-section';
+                el.style.padding = '15px';
+                el.style.borderRadius = '8px';
+                el.style.marginTop = '12px';
+                el.style.background = '#d1e7dd';
+                el.style.color = '#0f5132';
+                el.style.fontWeight = 'bold';
+                el.style.animation = 'slideDown 0.5s ease-out';
+                el.innerText = `✓ Tu pedido #${id} está listo para retiro.`;
                 v.prepend(el);
               }
             }catch(e){}
