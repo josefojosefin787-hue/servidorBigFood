@@ -98,10 +98,12 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--bg-gradient);
     color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
+
+/* Use normal document flow so sections can scroll naturally.
+   Previously this page used flex centering which can cause
+   unexpected scrolling/overflow behavior for multi-section pages. */
+
 
 /* Contenedor principal */
 .contenedor {

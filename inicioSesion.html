@@ -340,53 +340,45 @@ i<!DOCTYPE html>
             observer.observe(section);
         });
     </script>
-</body>
-
-</html>
-
-    <script>
-    // Control del tema oscuro
-    const toggleSwitch = document.querySelector('#checkbox');
     
-    // Verificar si hay una preferencia guardada
-    const currentTheme = localStorage.getItem('theme');
-    if (currentTheme) {
-        document.documentElement.setAttribute('data-theme', currentTheme);
-        if (currentTheme === 'dark') {
-            toggleSwitch.checked = true;
+    // --- Additional scripts (theme toggle + animated icons) ---
+    // Merged into the single script block so the document structure is valid.
+    (function(){
+        // Control del tema oscuro
+        const toggleSwitch = document.querySelector('#checkbox');
+        try {
+            const currentTheme = localStorage.getItem('theme');
+            if (currentTheme) {
+                document.documentElement.setAttribute('data-theme', currentTheme);
+                if (currentTheme === 'dark') toggleSwitch.checked = true;
+            }
+
+            toggleSwitch.addEventListener('change', function(e) {
+                if (e.target.checked) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        } catch (err) {
+            // In case toggleSwitch is not present or storage access fails, fail silently
+            console.warn('Theme toggle init failed', err);
         }
-    }
 
-    toggleSwitch.addEventListener('change', function(e) {
-        if (e.target.checked) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.setAttribute('data-theme', 'light');
-            localStorage.setItem('theme', 'light');
-        }
-    });
-
-    const iconos = document.querySelectorAll('.fondo-animado .icono');
-
+        // Inicializar posiciones de iconos animados
+        const iconos = document.querySelectorAll('.fondo-animado .icono');
         iconos.forEach(icono => {
-            // Posición horizontal aleatoria
             icono.style.left = Math.random() * 100 + '%';
-
-            // Posición vertical inicial aleatoria para que ya estén cayendo
             icono.style.top = -Math.random() * 100 + 'vh';
-
-            // Duración de la caída aleatoria (10 a 20 segundos)
             const duracion = 10 + Math.random() * 10;
             icono.style.animationDuration = duracion + 's';
-
-            // Retraso aleatorio (0 a 5 segundos)
             icono.style.animationDelay = Math.random() * 5 + 's';
         });
+    })();
 
-    </script>
 </body>
 
 </html>
 
-   

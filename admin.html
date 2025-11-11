@@ -142,17 +142,17 @@
           <h1>Panel de Administración</h1>
           <p class="admin-subtitle">Gestión de productos — agrupar por categoría y editar</p>
         </div>
-        <div id="adminSessionPanel" style="text-align:right;min-width:220px;">
+        <div id="adminSessionPanel" style="text-align:right;min-width:140px;max-width:320px;">
           <!-- Filled by JS: admin name, email, privileges and logout -->
-          <div id="adminSessionContent" style="display:flex;align-items:center;gap:10px;justify-content:flex-end">
-            <img id="adminAvatar" src="" alt="avatar" style="width:44px;height:44px;border-radius:999px;display:none;object-fit:cover;border:2px solid rgba(255,255,255,0.6)">
-            <div style="text-align:left;min-width:140px;">
-              <div id="adminName" style="font-weight:700;color:#fff">Invitado</div>
-              <div id="adminEmail" style="font-size:0.85rem;color:#eef9f0">-</div>
+          <div id="adminSessionContent" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:4px;">
+            <img id="adminAvatar" src="" alt="avatar" style="width:40px;height:40px;border-radius:999px;display:none;object-fit:cover;border:2px solid rgba(255,255,255,0.6)">
+            <div style="text-align:left;min-width:90px;max-width:160px;overflow:hidden;">
+              <div id="adminName" style="font-weight:700;color:#fff;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">Invitado</div>
+              <div id="adminEmail" style="font-size:0.75rem;color:#eef9f0;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">-</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-              <div id="adminPrivileges" style="font-size:0.8rem;color:#eaf7ec">Privilegios: administrador</div>
-              <button id="btnLogout" class="admin-button" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.18);padding:6px 10px;border-radius:8px;">Cerrar sesión</button>
+              <div id="adminPrivileges" style="font-size:0.75rem;color:#eaf7ec;white-space:nowrap;">Privilegios: administrador</div>
+              <button id="btnLogout" class="admin-button" style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.18);padding:6px 8px;border-radius:8px;">Cerrar sesión</button>
             </div>
           </div>
         </div>
@@ -215,28 +215,33 @@
 
     async function ensureAdmin(){
       try{
-        const r = await fetch('/api/admin/session', { credentials: 'same-origin' });
-        if (!r.ok) { window.location.href = '/admin-login.html'; return false; }
-        const j = await r.json();
-        if (!j || !j.admin) { window.location.href = '/admin-login.html'; return false; }
-        // populate session panel
-        const nameEl = document.getElementById('adminName');
-        const emailEl = document.getElementById('adminEmail');
-        const avatarEl = document.getElementById('adminAvatar');
-        const privEl = document.getElementById('adminPrivileges');
-        const logoutBtn = document.getElementById('btnLogout');
-        nameEl.textContent = j.admin.name || j.admin.email || 'Administrador';
-        emailEl.textContent = j.admin.email || '';
-        if (j.admin.picture) { avatarEl.src = j.admin.picture; avatarEl.style.display = 'block'; }
-        // privileges: allow DB lookup for roles if provided
-        if (j.admin.privileges) privEl.textContent = 'Privilegios: ' + j.admin.privileges;
-        else privEl.textContent = 'Privilegios: administrador';
-        logoutBtn.onclick = async ()=>{
-          await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
-          window.location.href = '/admin-login.html';
-        };
-        return true;
-      }catch(e){ console.warn('ensureAdmin error', e); window.location.href = '/admin-login.html'; return false; }
+      const r = await fetch('/api/admin/session', { credentials: 'same-origin' });
+      if (!r.ok) { window.location.href = '/admin-login.html'; return false; }
+      const j = await r.json();
+      if (!j || !j.admin) { window.location.href = '/admin-login.html'; return false; }
+      // populate session panel
+      const nameEl = document.getElementById('adminName');
+      const emailEl = document.getElementById('adminEmail');
+      const avatarEl = document.getElementById('adminAvatar');
+      const privEl = document.getElementById('adminPrivileges');
+      const logoutBtn = document.getElementById('btnLogout');
+      nameEl.textContent = j.admin.name || j.admin.email || 'Administrador';
+      emailEl.textContent = j.admin.email || '';
+      // handle avatar safely
+      if (j.admin.picture) {
+        avatarEl.src = j.admin.picture;
+        avatarEl.onload = () => { avatarEl.style.display = 'block'; };
+        avatarEl.onerror = () => { avatarEl.style.display = 'none'; };
+      } else { avatarEl.style.display = 'none'; }
+      // privileges: allow DB lookup for roles if provided
+      if (j.admin.privileges) privEl.textContent = 'Privilegios: ' + j.admin.privileges;
+      else privEl.textContent = 'Privilegios: administrador';
+      logoutBtn.onclick = async ()=>{
+        await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' });
+        window.location.href = '/admin-login.html';
+      };
+      return true;
+    }catch(e){ console.warn('ensureAdmin error', e); window.location.href = '/admin-login.html'; return false; }
     }
 
     async function checkDbStatus(){
@@ -478,3 +483,5 @@
   </script>
 </body>
 </html>
+
+<script src="/scripts/input_filter.js"></script>

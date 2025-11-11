@@ -109,6 +109,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// Middleware: filtrado básico de palabras prohibidas / intentos simples de inyección
+// Rechaza cualquier petición cuya URL, query, params o body contenga palabras/fragmentos en la lista.
+{
+  const BANNED = [
+    'mierda', 'hijo de puta', 'puta madre', 'puta', 'cabron', 'fuck', 'shit','tula', 'pichula', 'weon', 'webon', 'conchetumare', 'conchetumadre', 'putito', 'pablo', 'brian', 'pene', 'culo', 'raja', 'tetita','milf',
+    'drop database', 'drop table', 'delete from', 'truncate', 'insert', 'update', 'alter table', 'exec ', 'union select', 'or 1=1', '--', '/**/', 
+  ];
+  const esc = s => String(s).replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+  const BANNED_RE = new RegExp(BANNED.map(esc).join('|'), 'i');
+
+  function scanValue(v) {
+    if (!v) return false;
+    if (typeof v === 'string') return BANNED_RE.test(v.toLowerCase());
+    if (typeof v === 'number' || typeof v === 'boolean') return false;
+    if (Array.isArray(v)) return v.some(scanValue);
+    if (typeof v === 'object') return Object.values(v).some(scanValue);
+    return false;
+  }
+
+  app.use((req, res, next) => {
+    try {
+      const urlPart = String(req.originalUrl || req.url || '').toLowerCase();
+      if (BANNED_RE.test(urlPart)) {
+        console.warn('[FILTER] Rechazando petición por URL con contenido prohibido:', req.originalUrl);
+        return res.status(400).json({ error: 'Contenido prohibido detectado en URL' });
+      }
+      if (scanValue(req.query) || scanValue(req.params) || scanValue(req.body)) {
+        console.warn('[FILTER] Rechazando petición por cuerpo/params/query con contenido prohibido:', { path: req.path });
+        return res.status(400).json({ error: 'Contenido prohibido detectado en la petición' });
+      }
+    } catch (e) { /* ignore */ }
+    next();
+  });
+}
+
 // Servir archivos estáticos (ahora después de haber añadido sesiones y middleware de protección)
 app.use(express.static(path.join(__dirname)));
 
