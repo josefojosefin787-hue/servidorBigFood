@@ -758,6 +758,41 @@ app.post('/api/create-payment-intent', async (req, res) => {
   }
 });
 
+
+  // --- ¡NUEVO ENDPOINT PARA LA APLICACIÓN MÓVIL! ---
+  // Este endpoint es exclusivo para la app y no afectará a la web.
+  app.post('/api/create-payment-intent-mobile', async (req, res) => {
+    try {
+      const { amount } = req.body;
+
+      // 1. Validación robusta del monto
+      if (amount == null || amount <= 0) {
+        console.log("MOBILE: Solicitud rechazada: El monto es inválido o nulo:", amount);
+        return res.status(400).json({ error: 'Monto inválido.' });
+      }
+
+      console.log(`MOBILE: Creando PaymentIntent para el monto: ${amount}`);
+
+      // 2. Creación del PaymentIntent con la moneda correcta para la app
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount), // Aseguramos que sea un número entero
+        currency: 'clp',            // Moneda específica para la app móvil
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      });
+
+      console.log("MOBILE: PaymentIntent creado con éxito.");
+      res.json({
+        clientSecret: paymentIntent.client_secret
+      });
+
+    } catch (error) {
+      console.error("MOBILE: Error al crear PaymentIntent:", error.message);
+      res.status(500).json({ error: 'Error interno del servidor al contactar a Stripe.' });
+    }
+  });
+
 // Endpoint simple para exponer la publishable key al frontend (código sin cambios)
 app.get('/api/config', (req, res) => {
   res.json({ publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51SGsL4E06U1NNw23MU9zuqRK2hu2y5pEAWwSdGNOug8gQpvLP3yJ2WcsfYO77MEcuQfvxC7WRCVicP1zVzJQc1AP00Nv7qFCgD' });
