@@ -443,8 +443,11 @@ app.post('/api/admin/archive-today', async (req, res) => {
 
     let count = 0;
     for (const row of r.rows) {
+      // To avoid foreign-key constraint violations (archived_orders.original_order_id -> orders.id)
+      // we store the original order id inside metadata and pass NULL for original_order_id.
       const actor = req.session && req.session.admin ? (req.session.admin.name || req.session.admin.email || 'admin') : 'admin';
-      const params = [row.id, JSON.stringify(row.items || []), row.total || 0, now.toISOString(), JSON.stringify(Object.assign({}, row.metadata || {}, { archived_by: actor }))];
+      const metadataObj = Object.assign({}, row.metadata || {}, { archived_by: actor, original_order_id: row.id });
+      const params = [null, JSON.stringify(row.items || []), row.total || 0, now.toISOString(), JSON.stringify(metadataObj)];
       await client.query(insertSql, params);
       count++;
     }
