@@ -903,7 +903,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
     const pi = await stripe.paymentIntents.create({
       amount: Math.round(Number(amount)),
       currency: (currency || 'clp').toLowerCase(),
-      capture_method: 'manual',
+      // Al eliminar capture_method: 'manual', se usará el comportamiento por defecto de Stripe
       description: `Garantía orden ${orderId || 'n/a'}`,
       metadata: Object.assign({}, metadata || {}, { orderId: orderId || '' }),
       payment_method_types: ['card']
