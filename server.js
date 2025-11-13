@@ -843,6 +843,8 @@ app.post('/api/pedidos', async (req, res) => {
         paymentIntentId: body.paymentIntentId || null,
         sessionId: body.sessionId || null
       };
+      // Marcar origen por defecto como 'web' para pedidos creados desde la interfaz web
+      metadata.source = metadata.source || 'web';
       const sql = `INSERT INTO orders (external_id, items, total, status, customer_name, metadata)
                    VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
       const params = [body.sessionId || null, JSON.stringify(body.items), total, estado, body.cliente, metadata];
@@ -882,6 +884,7 @@ app.post('/api/pedidos', async (req, res) => {
     nota: body.nota || '',
     estado,
     paymentIntentId: body.paymentIntentId || null,
+    source: 'web',
     fecha: new Date().toISOString()
   };
   pedidos.push(pedido);
@@ -910,7 +913,87 @@ app.post('/api/create-payment-intent', async (req, res) => {
     });
 
     console.log('[API] PaymentIntent creado:', pi.id, 'amount=', pi.amount, 'currency=', pi.currency);
-    res.json({ clientSecret: pi.client_secret, paymentIntentId: pi.id });
+    // Si la petición incluye metadata con datos de pedido (ej. desde la app móvil),
+    // crear un registro de pedido provisional en la misma tabla/lista que usa la web
+    try {
+      const pedidoMeta = metadata || {};
+      // metadata may include a serialized `pedido` or fields like clientName/items
+      let cliente = pedidoMeta.clientName || pedidoMeta.cliente || null;
+      let items = pedidoMeta.items || pedidoMeta.pedido || null;
+      // items might be a JSON string
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items); } catch(e) { /* keep as string if not JSON */ }
+      }
+      const totalFromReq = Number(amount) || (pedidoMeta.amount ? Number(pedidoMeta.amount) : null);
+
+      function normalizeItems(arr) {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(it => {
+          if (it && typeof it === 'object') {
+            const qty = it.cantidad || it.qty || it.quantity || it.quantity || 1;
+            const name = it.nombre || it.name || (it.product && (it.product.nombre || it.product.name)) || '';
+            const price = Number(it.precio || it.price || (it.product && it.product.precio) || (it.product && it.product.price) || 0);
+            return { cantidad: Number(qty), nombre: name, precio: price };
+          }
+          return { cantidad: 1, nombre: String(it), precio: 0 };
+        });
+      }
+
+      if ((cliente || items) && totalFromReq != null) {
+        const pool = app.locals.db;
+        const estado = 'pendiente';
+        const externalId = pedidoMeta.orderId || orderId || null;
+        const metadataToStore = Object.assign({}, pedidoMeta, { paymentIntentId: pi.id });
+        // marcar origen como móvil
+        metadataToStore.source = metadataToStore.source || 'mobile';
+        const normalizedItems = normalizeItems(items || []);
+        if (pool) {
+          try {
+            const sql = `INSERT INTO orders (external_id, items, total, status, customer_name, metadata) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
+            const params = [externalId, JSON.stringify(normalizedItems), totalFromReq, estado, cliente, metadataToStore];
+            const r = await pool.query(sql, params);
+            const row = r.rows[0];
+            console.log('[API] Pedido provisional creado desde create-payment-intent en DB id=', row.id);
+            // optionally attach to response
+            req.createdPedido = {
+              id: row.id,
+              cliente: row.customer_name,
+              items: row.items,
+              total: Number(row.total),
+              estado: row.status,
+              paymentIntentId: metadataToStore.paymentIntentId,
+              fecha: row.created_at
+            };
+          } catch (e) { console.warn('No se pudo crear pedido provisional en DB desde create-payment-intent:', e.message || e); }
+        } else {
+          // fallback to file-based pedidos
+          try {
+            const pedidos = leerPedidos();
+            const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
+            const pedido = {
+              id,
+              cliente: cliente || '',
+              email: pedidoMeta.email || '',
+              items: normalizedItems,
+              total: totalFromReq,
+              metodoPago: pedidoMeta.metodoPago || 'tarjeta',
+              nota: pedidoMeta.nota || '',
+              estado,
+              paymentIntentId: pi.id,
+              fecha: new Date().toISOString()
+            };
+            pedidos.push(pedido);
+            guardarPedidos(pedidos);
+            console.log('[API] Pedido provisional creado (fallback) id=', pedido.id);
+            req.createdPedido = pedido;
+          } catch (e) { console.warn('No se pudo crear pedido provisional en archivo desde create-payment-intent:', e.message || e); }
+        }
+      }
+    } catch (e) { console.warn('Error procesando metadata para crear pedido provisional:', e && e.message ? e.message : e); }
+    // Return createdPedido if available to help client/UI show the provisional order
+    const resp = { clientSecret: pi.client_secret, paymentIntentId: pi.id };
+    if (req.createdPedido) resp.pedido = req.createdPedido;
+    res.json(resp);
   } catch (err) {
     console.error('create-payment-intent error', err);
     res.status(500).json({ error: err.message });
@@ -1069,20 +1152,73 @@ app.post('/stripe-webhook-mobile-app', express.raw({ type: 'application/json' })
 
       // 3. BLOQUE TRY...CATCH PARA LA BASE DE DATOS
       // Toda la lógica de inserción va aquí dentro.
-      const queryText = `
-        INSERT INTO pedidos (client_name, items, total, payment_intent_id, status)
-        VALUES ($1, $2, $3, $4, 'pagado')
-        RETURNING id;
-      `;
-      const values = [
-        orderDetails.clientName,
-        JSON.stringify(orderDetails.items), // Guardamos los items como un string JSON en la BD.
-        orderDetails.amount,
-        intent.id
-      ];
+      const pool = app.locals.db || pgPool;
+      function normalizeItems(arr) {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(it => {
+          if (it && typeof it === 'object') {
+            const qty = it.cantidad || it.qty || it.quantity || 1;
+            const name = it.nombre || it.name || (it.product && (it.product.nombre || it.product.name)) || '';
+            const price = Number(it.precio || it.price || (it.product && it.product.precio) || (it.product && it.product.price) || 0);
+            return { cantidad: Number(qty), nombre: name, precio: price };
+          }
+          return { cantidad: 1, nombre: String(it), precio: 0 };
+        });
+      }
 
-      const result = await pgPool.query(queryText, values);
-      console.log(`🎉 Pedido #${result.rows[0].id} guardado exitosamente en la base de datos (móvil).`);
+      if (pool) {
+        try {
+          // Check if a provisional order with this paymentIntent already exists
+          const qCheck = `SELECT * FROM orders WHERE (metadata->>'paymentIntentId' = $1 OR metadata->>'payment_intent_id' = $1) LIMIT 1`;
+          const chk = await pool.query(qCheck, [intent.id]);
+          if (chk && chk.rows && chk.rows.length) {
+            const existing = chk.rows[0];
+            const updateSql = `UPDATE orders SET status = $1, updated_at = now(), metadata = jsonb_set(COALESCE(metadata,'{}'::jsonb), '{paymentIntentId}', to_jsonb($2::text), true) WHERE id = $3 RETURNING *`;
+            const up = await pool.query(updateSql, ['completed', intent.id, existing.id]);
+            console.log(`🎉 Pedido existente #${existing.id} actualizado a pagado (webhook móvil).`);
+          } else {
+            const normalized = normalizeItems(orderDetails.items || []);
+            const sql = `INSERT INTO orders (external_id, items, total, status, customer_name, metadata) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
+            const params = [orderDetails.orderId || null, JSON.stringify(normalized), orderDetails.amount, 'completed', orderDetails.clientName, { paymentIntentId: intent.id, source: 'mobile' }];
+            const result = await pool.query(sql, params);
+            console.log(`🎉 Pedido #${result.rows[0].id} guardado exitosamente en la base de datos (móvil webhook).`);
+          }
+        } catch (e) {
+          console.error('Error guardando pedido desde webhook en DB:', e && e.message ? e.message : e);
+        }
+      } else {
+        // fallback to file-based: check existing by paymentIntentId
+        try {
+          const pedidos = leerPedidos();
+          const existing = pedidos.find(p => p.paymentIntentId === intent.id);
+          if (existing) {
+            existing.estado = 'pagado';
+            existing.fecha = new Date().toISOString();
+            guardarPedidos(pedidos);
+            console.log(`🎉 Pedido (fallback) #${existing.id} actualizado a pagado desde webhook móvil.`);
+          } else {
+            const id = pedidos.length ? (pedidos[pedidos.length - 1].id + 1) : 1;
+            const pedido = {
+              id,
+              cliente: orderDetails.clientName || '',
+              email: '',
+              items: orderDetails.items || [],
+              total: orderDetails.amount || 0,
+              metodoPago: 'tarjeta',
+              nota: '',
+              estado: 'pagado',
+              paymentIntentId: intent.id,
+              source: 'mobile',
+              fecha: new Date().toISOString()
+            };
+            pedidos.push(pedido);
+            guardarPedidos(pedidos);
+            console.log(`🎉 Pedido (fallback) #${pedido.id} guardado desde webhook móvil.`);
+          }
+        } catch (e) {
+          console.error('Error guardando pedido desde webhook (fallback):', e && e.message ? e.message : e);
+        }
+      }
 
     } catch (dbError) {
       // 4. MANEJO EXPLÍCITO DE ERRORES (tanto de parseo como de BD)

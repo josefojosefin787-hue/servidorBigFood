@@ -9,177 +9,36 @@
   <script src="https://js.stripe.com/v3/"></script>
   <style>
     /* Small page-specific tweaks to make layout similar to the reference */
-    header.site-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 18px 28px;
-      background: #fff;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
-      position: sticky;
-      top: 0;
-      z-index: 50
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px
-    }
-
-    .brand img {
-      height: 36px
-    }
-
-    nav.categories {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      overflow-x: auto;
-      padding: 12px 20px;
-      background: #fff
-    }
-
-    .cat-btn {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: none;
-      background: transparent;
-      cursor: pointer
-    }
-
-    .cat-btn.active {
-      box-shadow: 0 6px 16px rgba(0, 0, 0, .08);
-      background: #fff
-    }
-
-    .cat-btn img {
-      width: 48px;
-      height: 48px;
-      object-fit: cover;
-      border-radius: 8px
-    }
-
-    .main {
-      display: flex;
-      gap: 24px;
-      max-width: 1200px;
-      margin: 28px auto;
-      padding: 0 20px
-    }
-
-    .catalog {
-      flex: 1
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 18px
-    }
-
-    .product {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, .06);
-      text-align: center
-    }
-
-    .product img {
-      height: 140px;
-      object-fit: contain;
-      width: 100%;
-      border-radius: 8px
-    }
-
-    .product h4 {
-      margin: 10px 0 6px;
-      font-size: 1rem
-    }
-
-    .product .price {
-      font-weight: 700;
-      color: #1a7841
-    }
-
-    aside.cart {
-      width: 320px;
-      background: var(--carrito-bg);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, .06);
-      height: fit-content
-    }
-
-    aside.cart .line {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 10px 0
-    }
-
-    .qty {
-      display: flex;
-      gap: 6px;
-      align-items: center
-    }
-
-    .modal {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, .45);
-      z-index: 999
-    }
-
-    .modal.active {
-      display: flex
-    }
-
-    .modal-box {
-      background: var(--card-bg);
-      padding: 18px;
-      border-radius: 10px;
-      max-width: 520px;
-      width: 95%
-    }
-
-    .modal-box img {
-      width: 120px;
-      height: 120px;
-      object-fit: cover;
-      border-radius: 8px
-    }
-
-    .product-desc {
-      color: #444;
-      margin-top: 8px
-    }
-
-    @media(max-width:900px) {
-      .main {
-        flex-direction: column
-      }
-
-      .cart {
-        width: 100%
-      }
-    }
+    header.site-header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);position:sticky;top:0;z-index:50}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{height:36px}
+    nav.categories{display:flex;gap:12px;align-items:center;overflow-x:auto;padding:12px 20px;background:#fff}
+    .cat-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:none;background:transparent;cursor:pointer}
+    .cat-btn.active{box-shadow:0 6px 16px rgba(0,0,0,.08);background:#fff}
+    .cat-btn img{width:48px;height:48px;object-fit:cover;border-radius:8px}
+    .main{display:flex;gap:24px;max-width:1200px;margin:28px auto;padding:0 20px}
+    .catalog{flex:1}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
+    .product{background:var(--card-bg);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);text-align:center}
+    .product img{height:140px;object-fit:contain;width:100%;border-radius:8px}
+    .product h4{margin:10px 0 6px;font-size:1rem}
+    .product .price{font-weight:700;color:#1a7841}
+    aside.cart{width:320px;background:var(--carrito-bg);border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06);height:fit-content}
+    aside.cart .line{display:flex;align-items:center;gap:8px;margin:10px 0}
+    .qty{display:flex;gap:6px;align-items:center}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:999}
+    .modal.active{display:flex}
+    .modal-box{background:var(--card-bg);padding:18px;border-radius:10px;max-width:520px;width:95%}
+    .modal-box img{width:120px;height:120px;object-fit:cover;border-radius:8px}
+    .product-desc{color:#444;margin-top:8px}
+    @media(max-width:900px){.main{flex-direction:column}.cart{width:100%}}
   </style>
 </head>
 
 <body>
   <header class="site-header">
     <div class="brand">
-      <img src="/img/martitaLogoGrande.png" alt="BigFood logo"
-        onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+      <img src="/img/martitaLogoGrande.png" alt="BigFood logo" onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
       <div>
         <div style="font-weight:700">Menú de la Cafetería</div>
         <div style="font-size:.9rem;color:#666">Pide rápido y recoge</div>
@@ -201,21 +60,15 @@
     <aside class="cart" aria-label="Carrito">
       <h3 style="margin:0 0 8px 0;color:#1a7841">Carrito</h3>
       <div id="cartItems"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
-        <strong>Total</strong><strong id="cartTotal">$0</strong></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px"><strong>Total</strong><strong id="cartTotal">$0</strong></div>
 
       <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
-      <div class="line"><input id="cliente" placeholder="Tu nombre"
-          style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
-      <div class="line"><input id="email" placeholder="Correo electrónico"
-          style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
+      <div class="line"><input id="cliente" placeholder="Tu nombre" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
+      <div class="line"><input id="email" placeholder="Correo electrónico" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd"></div>
       <div class="line" style="margin-top:6px">
-        <button id="subscribePushBtn"
-          style="padding:8px 10px;border-radius:6px;border:1px solid #1a7841;background:#fff;color:#1a7841;cursor:pointer">Activar
-          notificaciones</button>
+        <button id="subscribePushBtn" style="padding:8px 10px;border-radius:6px;border:1px solid #1a7841;background:#fff;color:#1a7841;cursor:pointer">Activar notificaciones</button>
       </div>
-      <div class="line"><textarea id="notaPedido" rows="2" placeholder="Notas (opcional)"
-          style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea></div>
+      <div class="line"><textarea id="notaPedido" rows="2" placeholder="Notas (opcional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd"></textarea></div>
       <div class="line">
         <select id="metodoPago" style="width:100%;padding:8px;border-radius:6px;border:1px solid #ddd">
           <option value="card">Tarjeta (online)</option>
@@ -241,8 +94,7 @@
           <div class="product-desc" id="modalDesc">Descripción breve</div>
           <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
             <label>Cantidad</label>
-            <input id="modalQty" type="number" value="1" min="1"
-              style="width:70px;padding:6px;border-radius:6px;border:1px solid #ddd">
+            <input id="modalQty" type="number" value="1" min="1" style="width:70px;padding:6px;border-radius:6px;border:1px solid #ddd">
             <button id="modalAdd" class="boton-enviar">Agregar</button>
           </div>
         </div>
@@ -261,234 +113,145 @@
     </div>
   </div>
 
-  <!-- Empty-cart modal -->
-  <div id="emptyCartModal" class="modal" aria-hidden="true">
-    <div class="modal-box">
-      <h3 style="color:#c62828;margin:0 0 8px 0">Error</h3>
-      <p id="emptyCartMessage" style="margin:0 0 12px 0">El carrito está vacío</p>
-      <div style="text-align:right">
-        <button id="emptyCartOk" class="btn-submit" style="background:#c62828">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Notify: no-email modal -->
-  <div id="notifyNoEmailModal" class="modal" aria-hidden="true">
-    <div class="modal-box">
-      <h3 style="color:#c62828;margin:0 0 8px 0">Error</h3>
-      <p id="notifyNoEmailMessage" style="margin:0 0 12px 0">Ingresa tu correo en el campo para activar notificaciones</p>
-      <div style="text-align:right">
-        <button id="notifyNoEmailOk" class="btn-submit" style="background:#c62828">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Notify: subscription saved modal -->
-  <div id="notifySavedModal" class="modal" aria-hidden="true">
-    <div class="modal-box">
-      <h3 style="color:#1a7841;margin:0 0 8px 0">Notificaciones activadas</h3>
-      <p id="notifySavedMessage" style="margin:0 0 12px 0">Suscripción guardada. Te notificaremos cuando tu pedido esté listo.</p>
-      <div style="text-align:right">
-        <button id="notifySavedOk" class="btn-submit" style="background:#1a7841">OK</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Generic alert modal -->
-  <div id="alertModal" class="modal" aria-hidden="true">
-    <div class="modal-box">
-      <h3 id="alertModalTitle" style="margin:0 0 8px 0;color:#c62828">Aviso</h3>
-      <p id="alertModalMessage" style="margin:0 0 12px 0">Mensaje</p>
-      <div style="text-align:right">
-        <button id="alertModalOk" class="btn-submit" style="background:#c62828">OK</button>
-      </div>
-    </div>
-  </div>
-
   <script>
     // Basic client implementation that uses the same API as the original app.
     const API_PRODUCTS = '/api/products';
     let products = [];
-    let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    let cart = JSON.parse(localStorage.getItem('cart')||'[]');
 
     // Banned tokens (same as server). Keep lower-case here.
-    const BANNED_TOKENS = ['mierda', 'hijo de puta', 'puta madre', 'puta', 'cabron', 'fuck', 'shit', 'tula', 'pichula', 'weon', 'webon', 'conchetumare', 'conchetumadre', 'putito', 'pablo', 'brian', 'pene', 'culo', 'raja', 'tetita', 'milf', 'drop database', 'drop table', 'delete from', 'truncate', 'insert', 'update', 'alter table', 'exec ', 'union select', 'or 1=1', '--', '/**/'];
+    const BANNED_TOKENS = ['mierda','hijo de puta','puta madre','puta','cabron','fuck','shit','tula','pichula','weon','webon','conchetumare','conchetumadre','putito','pablo','brian','pene','culo','raja','tetita','milf','drop database','drop table','delete from','truncate','insert','update','alter table','exec ','union select','or 1=1','--','/**/'];
 
-    const esc = s => String(s).replace(/[\\^$.*+?()\[\]{}|]/g, '\\$&');
-    function findBannedInText(text) { if (!text) return null; const t = String(text).toLowerCase(); for (const token of BANNED_TOKENS) { const tok = token.toLowerCase(); if (/^\w+$/.test(tok)) { const re = new RegExp('\\b' + esc(tok) + '\\b', 'i'); if (re.test(t)) return token; } else { if (t.indexOf(tok) !== -1) return token; } } return null; }
+    const esc = s=>String(s).replace(/[\\^$.*+?()\[\]{}|]/g,'\\$&');
+    function findBannedInText(text){ if(!text) return null; const t=String(text).toLowerCase(); for(const token of BANNED_TOKENS){ const tok=token.toLowerCase(); if(/^\w+$/.test(tok)){ const re=new RegExp('\\b'+esc(tok)+'\\b','i'); if(re.test(t)) return token;} else { if(t.indexOf(tok)!==-1) return token; } } return null; }
 
     // Fetch products
-    async function fetchProducts() { try { const r = await fetch(API_PRODUCTS); products = await r.json(); renderCategories(); renderProducts(); } catch (e) { console.error('fetchProducts', e); products = []; renderProducts(); } }
+    async function fetchProducts(){ try{ const r=await fetch(API_PRODUCTS); products = await r.json(); renderCategories(); renderProducts(); }catch(e){ console.error('fetchProducts',e); products=[]; renderProducts(); } }
 
     // Render categories
-    function renderCategories() {
-      const nav = document.getElementById('categoriesNav'); nav.innerHTML = ''; const cats = Array.from(new Set(products.map(p => p.categoria || 'Otros'))); // include 'Todos' first
-      const allBtn = createCatButton('Todos', '/img/MartitaLogoPequeño.png', true); nav.appendChild(allBtn);
-      cats.forEach(c => { const img = (products.find(p => p.categoria === c && p.img) || {}).img || '/img/MartitaLogoPequeño.png'; nav.appendChild(createCatButton(c, img, false)); });
+    function renderCategories(){ const nav = document.getElementById('categoriesNav'); nav.innerHTML=''; const cats = Array.from(new Set(products.map(p=>p.categoria||'Otros'))); // include 'Todos' first
+      const allBtn = createCatButton('Todos','/img/MartitaLogoPequeño.png',true); nav.appendChild(allBtn);
+      cats.forEach(c=>{ const img = (products.find(p=>p.categoria===c && p.img) || {}).img || '/img/MartitaLogoPequeño.png'; nav.appendChild(createCatButton(c,img,false)); });
     }
-    function createCatButton(cat, img, active) { const btn = document.createElement('button'); btn.className = 'cat-btn' + (active ? ' active' : ''); btn.innerHTML = `<img src='${img}' alt='${cat}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'"><small style='font-size:.85rem'>${cat}</small>`; btn.dataset.cat = cat; btn.addEventListener('click', () => { document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); renderProducts(cat); }); return btn; }
+    function createCatButton(cat,img,active){ const btn = document.createElement('button'); btn.className='cat-btn'+(active? ' active':''); btn.innerHTML=`<img src='${img}' alt='${cat}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'"><small style='font-size:.85rem'>${cat}</small>`; btn.dataset.cat=cat; btn.addEventListener('click',()=>{ document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderProducts(cat); }); return btn; }
 
     // Render product grid
-    function renderProducts(filter) {
-      const grid = document.getElementById('productsGrid'); grid.innerHTML = ''; const list = (filter && filter !== 'Todos') ? products.filter(p => p.categoria === filter) : products; list.forEach(p => {
-        const div = document.createElement('div'); div.className = 'product'; div.innerHTML = `
-        <img src='${p.img || "/img/placeholder.svg"}' alt='${p.nombre || "Producto"}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
-        <h4>${p.nombre || 'Sin nombre'}</h4>
-        <div class='price'>$${typeof p.precio !== 'undefined' ? Number(p.precio) : '0'}</div>
-      `; div.addEventListener('click', () => openProductModal(p)); grid.appendChild(div);
-      });
+    function renderProducts(filter){ const grid = document.getElementById('productsGrid'); grid.innerHTML=''; const list = (filter && filter!=='Todos') ? products.filter(p=>p.categoria===filter) : products; list.forEach(p=>{ const div=document.createElement('div'); div.className='product'; div.innerHTML = `
+        <img src='${p.img||"/img/placeholder.svg"}' alt='${p.nombre||"Producto"}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
+        <h4>${p.nombre||'Sin nombre'}</h4>
+        <div class='price'>$${typeof p.precio!=='undefined'?Number(p.precio):'0'}</div>
+      `; div.addEventListener('click',()=> openProductModal(p)); grid.appendChild(div); });
     }
 
     // Cart functions
-    function addToCart(product, qty = 1) { const existing = cart.find(i => i.id === product.id); if (existing) existing.cantidad += qty; else cart.push({ id: product.id, nombre: product.nombre, precio: product.precio, cantidad: qty }); localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); }
-    function renderCart() { const el = document.getElementById('cartItems'); el.innerHTML = ''; if (!cart.length) { el.innerHTML = '<p style="color:#666">Carrito vacío</p>'; document.getElementById('cartTotal').textContent = '$0'; return; } let total = 0; cart.forEach(item => { total += (item.precio || 0) * item.cantidad; const row = document.createElement('div'); row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '10px'; row.style.marginBottom = '8px'; row.innerHTML = `<div style="flex:1">${item.cantidad} x ${item.nombre}</div><div style="font-weight:700">$${(item.precio * item.cantidad)}</div><div><button data-id='${item.id}' style='margin-left:8px'>-</button></div>`; row.querySelector('button').addEventListener('click', () => { item.cantidad--; if (item.cantidad <= 0) cart = cart.filter(c => c.id !== item.id); localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); }); el.appendChild(row); }); document.getElementById('cartTotal').textContent = '$' + total; }
+    function addToCart(product, qty=1){ const existing = cart.find(i=>i.id===product.id); if(existing) existing.cantidad += qty; else cart.push({ id:product.id, nombre:product.nombre, precio:product.precio, cantidad: qty }); localStorage.setItem('cart',JSON.stringify(cart)); renderCart(); }
+    function renderCart(){ const el = document.getElementById('cartItems'); el.innerHTML=''; if(!cart.length){ el.innerHTML='<p style="color:#666">Carrito vacío</p>'; document.getElementById('cartTotal').textContent='$0'; return; } let total=0; cart.forEach(item=>{ total += (item.precio||0)*item.cantidad; const row = document.createElement('div'); row.style.display='flex'; row.style.alignItems='center'; row.style.gap='10px'; row.style.marginBottom='8px'; row.innerHTML = `<div style="flex:1">${item.cantidad} x ${item.nombre}</div><div style="font-weight:700">$${(item.precio*item.cantidad)}</div><div><button data-id='${item.id}' style='margin-left:8px'>-</button></div>`; row.querySelector('button').addEventListener('click',()=>{ item.cantidad--; if(item.cantidad<=0) cart = cart.filter(c=>c.id!==item.id); localStorage.setItem('cart',JSON.stringify(cart)); renderCart(); }); el.appendChild(row); }); document.getElementById('cartTotal').textContent = '$'+total; }
 
     // Product modal
     let currentModalProduct = null;
-    function openProductModal(p) { currentModalProduct = p; document.getElementById('modalImg').src = p.img || '/img/placeholder.svg'; document.getElementById('modalTitle').textContent = p.nombre || 'Sin nombre'; document.getElementById('modalPrice').textContent = '$' + (typeof p.precio !== 'undefined' ? Number(p.precio) : 0); document.getElementById('modalDesc').textContent = p.description || p.descripcion || 'Descripción: ejemplo - bombones con relleno de distintos sabores.'; document.getElementById('productModal').classList.add('active'); document.getElementById('productModal').setAttribute('aria-hidden', 'false'); }
-    document.getElementById('closeModal').addEventListener('click', () => { document.getElementById('productModal').classList.remove('active'); document.getElementById('productModal').setAttribute('aria-hidden', 'true'); });
-    document.getElementById('modalAdd').addEventListener('click', () => { const q = Math.max(1, Number(document.getElementById('modalQty').value || 1)); if (currentModalProduct) addToCart(currentModalProduct, q); document.getElementById('productModal').classList.remove('active'); });
+    function openProductModal(p){ currentModalProduct = p; document.getElementById('modalImg').src = p.img || '/img/placeholder.svg'; document.getElementById('modalTitle').textContent = p.nombre || 'Sin nombre'; document.getElementById('modalPrice').textContent = '$'+(typeof p.precio!=='undefined'?Number(p.precio):0); document.getElementById('modalDesc').textContent = p.description || p.descripcion || 'Descripción: ejemplo - bombones con relleno de distintos sabores.'; document.getElementById('productModal').classList.add('active'); document.getElementById('productModal').setAttribute('aria-hidden','false'); }
+    document.getElementById('closeModal').addEventListener('click',()=>{ document.getElementById('productModal').classList.remove('active'); document.getElementById('productModal').setAttribute('aria-hidden','true'); });
+    document.getElementById('modalAdd').addEventListener('click',()=>{ const q = Math.max(1, Number(document.getElementById('modalQty').value||1)); if(currentModalProduct) addToCart(currentModalProduct,q); document.getElementById('productModal').classList.remove('active'); });
 
     // Banned modal
-    function showBanned(token) { document.getElementById('bannedMessage').textContent = `Se detectó: "${token}". Cámbiala para continuar.`; document.getElementById('bannedModal').classList.add('active'); document.getElementById('bannedModal').setAttribute('aria-hidden', 'false'); }
-    document.getElementById('bannedOk').addEventListener('click', () => { document.getElementById('bannedModal').classList.remove('active'); document.getElementById('bannedModal').setAttribute('aria-hidden', 'true'); });
+    function showBanned(token){ document.getElementById('bannedMessage').textContent = `Se detectó: "${token}". Cámbiala para continuar.`; document.getElementById('bannedModal').classList.add('active'); document.getElementById('bannedModal').setAttribute('aria-hidden','false'); }
+    document.getElementById('bannedOk').addEventListener('click',()=>{ document.getElementById('bannedModal').classList.remove('active'); document.getElementById('bannedModal').setAttribute('aria-hidden','true'); });
 
-    // Empty cart modal
-    function showEmptyCartModal() {
-      const msg = document.getElementById('emptyCartMessage');
-      if (msg) msg.textContent = 'El carrito está vacío';
-      const m = document.getElementById('emptyCartModal');
-      if (m) { m.classList.add('active'); m.setAttribute('aria-hidden', 'false'); }
-    }
-    document.getElementById('emptyCartOk').addEventListener('click', () => { const m = document.getElementById('emptyCartModal'); if (m) { m.classList.remove('active'); m.setAttribute('aria-hidden', 'true'); } });
-
-    // Notify - no email modal
-    function showNotifyNoEmailModal() {
-      const msg = document.getElementById('notifyNoEmailMessage');
-      if (msg) msg.textContent = 'Ingresa tu correo en el campo para activar notificaciones';
-      const m = document.getElementById('notifyNoEmailModal');
-      if (m) { m.classList.add('active'); m.setAttribute('aria-hidden', 'false'); }
-    }
-    document.getElementById('notifyNoEmailOk').addEventListener('click', () => { const m = document.getElementById('notifyNoEmailModal'); if (m) { m.classList.remove('active'); m.setAttribute('aria-hidden', 'true'); } });
-
-    // Notify - saved modal (optional custom message)
-    function showNotifySavedModal(customMsg) {
-      const msgEl = document.getElementById('notifySavedMessage');
-      if (msgEl) msgEl.textContent = customMsg || 'Suscripción guardada. Te notificaremos cuando tu pedido esté listo.';
-      const m = document.getElementById('notifySavedModal');
-      if (m) { m.classList.add('active'); m.setAttribute('aria-hidden', 'false'); }
-    }
-    document.getElementById('notifySavedOk').addEventListener('click', () => { const m = document.getElementById('notifySavedModal'); if (m) { m.classList.remove('active'); m.setAttribute('aria-hidden', 'true'); } });
-
-    // Generic alert modal helper
-    function showAlertModal(title, message) {
-      const t = document.getElementById('alertModalTitle');
-      const m = document.getElementById('alertModalMessage');
-      if (t) t.textContent = title || 'Aviso';
-      if (m) m.textContent = message || '';
-      const modal = document.getElementById('alertModal');
-      if (modal) { modal.classList.add('active'); modal.setAttribute('aria-hidden', 'false'); }
-    }
-    document.getElementById('alertModalOk').addEventListener('click', () => { const md = document.getElementById('alertModal'); if (md) { md.classList.remove('active'); md.setAttribute('aria-hidden', 'true'); } });
-
-    // --- Service Worker & Push subscription helpers ---
-    function urlBase64ToUint8Array(base64String) {
-      const padding = '='.repeat((4 - base64String.length % 4) % 4);
-      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-      const rawData = atob(base64);
-      const outputArray = new Uint8Array(rawData.length);
-      for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-      }
-      return outputArray;
-    }
-
-    async function registerServiceWorker() {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        alert('Notificaciones push no soportadas en este navegador');
-        return null;
-      }
-      try {
-        const reg = await navigator.serviceWorker.register('/service-worker.js');
-        return reg;
-      } catch (e) {
-        console.error('Error registrando service worker', e);
-        return null;
-      }
-    }
-
-    async function subscribeUser() {
-      const email = document.getElementById('email').value.trim();
-      if (!email) { showNotifyNoEmailModal(); return; }
-      const reg = await registerServiceWorker();
-      if (!reg) return;
-      try {
-        // fetch VAPID public key
-        const r = await fetch('/api/vapidPublicKey');
-        if (!r.ok) {
-          const txt = await r.text().catch(() => '');
-          console.error('/api/vapidPublicKey error', r.status, txt);
-          alert('No está configurada la clave VAPID en el servidor (ver consola)');
-          return;
+      // --- Service Worker & Push subscription helpers ---
+      function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
         }
-        const data = await r.json();
-        const vapidPublicKey = data.publicKey;
-        if (!vapidPublicKey) {
-          console.error('vapidPublicKey missing in response', data);
-          alert('La clave VAPID pública no está disponible (ver consola)');
-          return;
-        }
-        // subscribe (applicationServerKey must be Uint8Array)
-        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
-        const subObj = (typeof sub.toJSON === 'function') ? sub.toJSON() : sub;
-        console.log('Push subscription created', subObj);
-
-        // send to server (send a plain JSON object)
-        const res = await fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: email, subscription: subObj }) });
-        if (res.ok) {
-          showNotifySavedModal();
-        } else {
-          const txt = await res.text().catch(() => null);
-          console.error('/api/subscribe failed', res.status, txt);
-          showNotifySavedModal('No se pudo guardar suscripción (ver consola para más detalles)');
-        }
-      } catch (e) {
-        console.error('subscribeUser error', e && e.stack ? e.stack : e);
-        showNotifySavedModal('Error al suscribirse a notificaciones: ' + (e && e.message ? e.message : String(e)));
+        return outputArray;
       }
-    }
 
-    document.getElementById('subscribePushBtn').addEventListener('click', subscribeUser);
+      async function registerServiceWorker() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          alert('Notificaciones push no soportadas en este navegador');
+          return null;
+        }
+        try {
+          const reg = await navigator.serviceWorker.register('/service-worker.js');
+          return reg;
+        } catch (e) {
+          console.error('Error registrando service worker', e);
+          return null;
+        }
+      }
+
+      async function subscribeUser() {
+        const email = document.getElementById('email').value.trim();
+        if (!email) { alert('Ingresa tu correo en el campo para activar notificaciones'); return; }
+        const reg = await registerServiceWorker();
+        if (!reg) return;
+        try {
+          // fetch VAPID public key
+          const r = await fetch('/api/vapidPublicKey');
+          if (!r.ok) {
+            const txt = await r.text().catch(() => '');
+            console.error('/api/vapidPublicKey error', r.status, txt);
+            alert('No está configurada la clave VAPID en el servidor (ver consola)');
+            return;
+          }
+          const data = await r.json();
+          const vapidPublicKey = data.publicKey;
+          if (!vapidPublicKey) {
+            console.error('vapidPublicKey missing in response', data);
+            alert('La clave VAPID pública no está disponible (ver consola)');
+            return;
+          }
+          // subscribe (applicationServerKey must be Uint8Array)
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) });
+          const subObj = (typeof sub.toJSON === 'function') ? sub.toJSON() : sub;
+          console.log('Push subscription created', subObj);
+
+          // send to server (send a plain JSON object)
+          const res = await fetch('/api/subscribe', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ user_id: email, subscription: subObj }) });
+          if (res.ok) {
+            alert('Suscripción guardada. Te notificaremos cuando tu pedido esté listo.');
+          } else {
+            const txt = await res.text().catch(()=>null);
+            console.error('/api/subscribe failed', res.status, txt);
+            alert('No se pudo guardar suscripción (ver consola para más detalles)');
+          }
+        } catch (e) {
+          console.error('subscribeUser error', e && e.stack ? e.stack : e);
+          alert('Error al suscribirse a notificaciones: ' + (e && e.message ? e.message : String(e)));
+        }
+      }
+
+      document.getElementById('subscribePushBtn').addEventListener('click', subscribeUser);
 
     // Checkout handler (basic: use create-checkout-session or create order)
-    document.getElementById('procesar').addEventListener('click', async () => {
+    document.getElementById('procesar').addEventListener('click', async ()=>{
       const cliente = document.getElementById('cliente').value.trim();
       const email = document.getElementById('email').value.trim();
       const nota = document.getElementById('notaPedido').value.trim();
       const metodo = document.getElementById('metodoPago').value;
-  // simple validation & banned-words
-  const banned = findBannedInText(cliente) || findBannedInText(nota) || findBannedInText(email);
-  if (banned) { showBanned(banned); return; }
-  if (!cliente) { showAlertModal('Error', 'Ingresa tu nombre'); return; }
-  if (!email) { showAlertModal('Error', 'Ingresa un correo válido'); return; }
-  // extra email validation: must contain '@' and 'gmail'
-  const lowerEmail = String(email).toLowerCase();
-  if (!lowerEmail.includes('@') || !lowerEmail.includes('gmail')) { showAlertModal('Error', 'El correo no es válido (debe contener @ y gmail)'); return; }
-  if (!cart.length) { showEmptyCartModal(); return; }
-      try {
-        if (metodo === 'card') {
-          const res = await fetch('/api/create-checkout-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, email, items: cart, nota }) });
-          const data = await res.json(); if (data && data.url) { localStorage.setItem('ultimoCliente', cliente); localStorage.removeItem('cart'); cart = []; renderCart(); window.location.href = data.url; } else { alert('No se pudo iniciar el pago'); console.error(data); }
+      // simple validation & banned-words
+      const banned = findBannedInText(cliente) || findBannedInText(nota) || findBannedInText(email);
+      if(banned){ showBanned(banned); return; }
+      if(!cliente){ alert('Ingresa tu nombre'); return; }
+      if(!email){ alert('Ingresa un correo válido'); return; }
+      if(!cart.length){ alert('Carrito vacío'); return; }
+      try{
+        if(metodo === 'card'){
+          const res = await fetch('/api/create-checkout-session',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items: cart, nota }) });
+          const data = await res.json(); if(data && data.url){ localStorage.setItem('ultimoCliente',cliente); localStorage.removeItem('cart'); cart=[]; renderCart(); window.location.href = data.url; } else { alert('No se pudo iniciar el pago'); console.error(data); }
         } else {
           // simple create order
-          const res = await fetch('/api/pedidos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, email, items: cart, nota, metodoPago: metodo }) });
-          const data = await res.json(); if (data && data.pedido && data.pedido.id) { localStorage.setItem('ultimoCliente', cliente); localStorage.removeItem('cart'); cart = []; renderCart(); window.location.href = `/success.html?pedidoId=${data.pedido.id}`; } else { alert('No se pudo crear el pedido'); console.error(data); }
+          const res = await fetch('/api/pedidos', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ cliente, email, items:cart, nota, metodoPago:metodo }) });
+          const data = await res.json(); if(data && data.pedido && data.pedido.id){ localStorage.setItem('ultimoCliente',cliente); localStorage.removeItem('cart'); cart=[]; renderCart(); window.location.href = `/success.html?pedidoId=${data.pedido.id}`; } else { alert('No se pudo crear el pedido'); console.error(data); }
         }
-      } catch (e) { alert('Error conectando con el servidor: ' + (e.message || e)); }
+      }catch(e){ alert('Error conectando con el servidor: '+(e.message||e)); }
     });
 
     // init
-    (function init() { renderCart(); fetchProducts(); })();
+    (function init(){ renderCart(); fetchProducts(); })();
   </script>
 </body>
 

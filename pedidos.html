@@ -23,6 +23,10 @@
     .status-preparacion{ background:#cfe2ff;color:#084298 }
     .status-listo{ background:#d1e7dd;color:#0f5132 }
     .small{ font-size:0.9rem; color:var(--muted) }
+    .origin-badge{ padding:6px 8px;border-radius:999px;font-weight:700;display:inline-block;font-size:0.85rem }
+    .origin-web{ background:#e6f7ec;color:#0b8e4d }
+    .origin-mobile{ background:#fff4e6;color:#d97706 }
+    .origin-unknown{ background:#f0f0f0;color:#666 }
     @media (max-width:900px){ .pedidos-card{ padding:18px } table.pedidos-table th, table.pedidos-table td{ padding:10px } }
   </style>
 </head>
@@ -71,7 +75,7 @@
     <div class="table-wrap">
       <table class="pedidos-table" aria-label="Lista de pedidos">
         <thead>
-          <tr><th>ID</th><th>Cliente</th><th>Items</th><th>Total</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr>
+          <tr><th>ID</th><th>Cliente</th><th>Origen</th><th>Items</th><th>Total</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr>
         </thead>
         <tbody id="tabla"></tbody>
       </table>
@@ -128,6 +132,8 @@
       (pedidos||[]).slice().reverse().forEach(p=>{
         const tr = document.createElement('tr');
         const itemsHTML = (p.items||[]).map(i=> (i.cantidad||i.qty||1) + ' x ' + (i.nombre||i.name||i.product_code||i.product_code||'' )).join('<br>');
+        const source = (p.metadata && p.metadata.source) || p.source || p.origin || (p.paymentIntentId? 'mobile' : 'web') || 'web';
+        const sourceClass = source === 'mobile' ? 'origin-mobile' : (source === 'web' ? 'origin-web' : 'origin-unknown');
         const estadoRaw = String(p.estado||p.status||'').trim();
         const estadoSafe = estadoRaw.toLowerCase();
         let estadoClass = 'status-pendiente';
@@ -136,6 +142,7 @@
         tr.innerHTML = `
           <td>${p.id}</td>
           <td>${p.cliente || p.customer_name || ''}<div class="small">${p.email || (p.metadata&&p.metadata.email) || ''}</div></td>
+          <td><span class="origin-badge ${sourceClass}">${source}</span></td>
           <td>${itemsHTML}</td>
           <td>$${p.total}</td>
           <td>${new Date(p.fecha || p.created_at || p.archived_at || Date.now()).toLocaleString()}</td>
@@ -224,7 +231,7 @@
         document.getElementById('btnArchiveToday').style.display = 'none';
         document.getElementById('archiveInfo').textContent = 'Mostrando lista archivada: ' + date;
         // map archived orders to a uniform structure
-        const orders = (j.orders||[]).map(o=>({ id: o.id || o.original_order_id || o.id, cliente: (o.metadata&&o.metadata.customer_name) || o.customer_name || o.customer || '', items: o.items || [], total: o.total || 0, fecha: o.archived_at || o.created_at || null, estado: o.status || 'archivado' }));
+        const orders = (j.orders||[]).map(o=>({ id: o.id || o.original_order_id || o.id, cliente: (o.metadata&&o.metadata.customer_name) || o.customer_name || o.customer || '', items: o.items || [], total: o.total || 0, fecha: o.archived_at || o.created_at || null, estado: o.status || 'archivado', metadata: o.metadata || {} }));
         renderPedidos(orders);
       }catch(e){ console.error('loadArchive error', e); alert('Error cargando archive'); }
     }
