@@ -990,6 +990,112 @@ app.post('/api/cancel-payment-intent', async (req, res) => {
   }
 });
 
+// === ENDPOINT EXCLUSIVO PARA APP MÓVIL: CREAR PAYMENT INTENT ===
+app.post('/api/create-payment-intent-mobile-app', async (req, res) => {
+  try {
+    // 1. EXTRAER EL CUERPO COMPLETO DE LA SOLICITUD
+    // `req.body` ahora contiene { clientName, amount, items, ... } enviado desde el móvil.
+    const orderData = req.body;
+    const { amount } = orderData; // Extraemos solo el `amount` para el PaymentIntent.
+
+    // ¡VERIFICACIÓN IMPORTANTE!
+    console.log("Datos del pedido recibidos en /create-payment-intent-mobile-app:", orderData);
+
+    const customer = await stripe.customers.create();
+    const ephemeralKey = await stripe.ephemeralKeys.create(
+      { customer: customer.id },
+      { apiVersion: '2020-08-27' }
+    );
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount * 100), // Stripe usa centavos.
+      currency: 'clp',
+      customer: customer.id,
+      payment_method_types: ['card'],
+      // 2. ASIGNACIÓN DE METADATA
+      // Serializamos el objeto completo del pedido a un string JSON.
+      // El webhook NO puede leer objetos anidados, debe ser un string.
+      metadata: {
+        pedido: JSON.stringify(orderData)
+      }
+    });
+
+    res.json({
+      clientSecret: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: customer.id,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+    });
+  } catch (error) {
+    console.error('Error al crear el Payment Intent (móvil):', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// === ENDPOINT EXCLUSIVO PARA APP MÓVIL: STRIPE WEBHOOK ===
+app.post('/stripe-webhook-mobile-app', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error(`❌ Error en la firma del webhook (móvil): ${err.message}`);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Manejar el evento payment_intent.succeeded
+  if (event.type === 'payment_intent.succeeded') {
+    const intent = event.data.object;
+    console.log('✅ PaymentIntent exitoso (móvil):', intent.id);
+
+    // --- DIAGNÓSTICO DEL WEBHOOK ---
+    // 1. REGISTRO DE DATOS CRUDOS DE METADATA
+    console.log("Metadata cruda recibida en el webhook (móvil):", intent.metadata);
+    console.log("Contenido de intent.metadata.pedido:", intent.metadata.pedido);
+    let orderDetails;
+    try {
+      // 2. INTENTO DE PARSEAR LA METADATA
+      if (!intent.metadata.pedido) {
+          throw new Error("La metadata 'pedido' está vacía o no existe.");
+      }
+      orderDetails = JSON.parse(intent.metadata.pedido);
+      console.log("Metadata parseada correctamente (móvil):", orderDetails);
+
+      // Verificación de campos esenciales
+      if (!orderDetails.clientName || !orderDetails.items || !orderDetails.amount) {
+          throw new Error("Faltan datos esenciales en la metadata (clientName, items, o amount).");
+      }
+
+      // 3. BLOQUE TRY...CATCH PARA LA BASE DE DATOS
+      // Toda la lógica de inserción va aquí dentro.
+      const queryText = `
+        INSERT INTO pedidos (client_name, items, total, payment_intent_id, status)
+        VALUES ($1, $2, $3, $4, 'pagado')
+        RETURNING id;
+      `;
+      const values = [
+        orderDetails.clientName,
+        JSON.stringify(orderDetails.items), // Guardamos los items como un string JSON en la BD.
+        orderDetails.amount,
+        intent.id
+      ];
+
+      const result = await pgPool.query(queryText, values);
+      console.log(`🎉 Pedido #${result.rows[0].id} guardado exitosamente en la base de datos (móvil).`);
+
+    } catch (dbError) {
+      // 4. MANEJO EXPLÍCITO DE ERRORES (tanto de parseo como de BD)
+      console.error('❌ ¡FALLO CRÍTICO! No se pudo guardar el pedido en la base de datos (móvil).');
+      console.error('Error Detallado:', dbError.message);
+      console.error('Detalles del Pedido que falló:', orderDetails || intent.metadata.pedido);
+      // Aquí podrías añadir una alerta (ej. enviar un email) para notificar del fallo.
+    }
+  }
+
+  res.json({ received: true });
+});
+
 // Endpoint para listar pedidos
 app.get('/api/pedidos', async (req, res) => {
   const pool = app.locals.db;
