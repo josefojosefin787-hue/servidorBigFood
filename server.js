@@ -79,8 +79,29 @@ if (pgPool) {
         summary jsonb
       )`);
       console.log('[INIT] Tabla order_archives verificada.');
+
+      await pgPool.query(`CREATE TABLE IF NOT EXISTS feedback (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        email text,
+        category text,
+        message text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT NOW(),
+        metadata jsonb
+      )`);
+      console.log('[INIT] Tabla feedback verificada.');
+
+      await pgPool.query(`CREATE TABLE IF NOT EXISTS reviews (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        rating integer NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        comment text,
+        created_at timestamptz NOT NULL DEFAULT NOW(),
+        metadata jsonb
+      )`);
+      console.log('[INIT] Tabla reviews verificada.');
     } catch (e) {
-      console.error('[INIT] No se pudo verificar/crear order_archives:', e.message || e);
+      console.error('[INIT] Error preparando tablas iniciales:', e.message || e);
     }
   })();
 } else {
@@ -217,10 +238,14 @@ const DATA_DIR = chooseDataDir();
 const PEDIDOS_FILE = path.join(DATA_DIR, 'pedidos.json');
 // Nuevo directorio para archivos de pedidos diarios
 const ARCHIVE_DIR = path.join(DATA_DIR, 'pedidos_archivados');
+const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.json');
+const REVIEWS_FILE = path.join(DATA_DIR, 'reviews.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(ARCHIVE_DIR)) fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
 if (!fs.existsSync(PEDIDOS_FILE)) fs.writeFileSync(PEDIDOS_FILE, JSON.stringify([]));
+if (!fs.existsSync(FEEDBACK_FILE)) fs.writeFileSync(FEEDBACK_FILE, JSON.stringify([]));
+if (!fs.existsSync(REVIEWS_FILE)) fs.writeFileSync(REVIEWS_FILE, JSON.stringify([]));
 
 function leerPedidos() {
   try {
@@ -234,6 +259,42 @@ function leerPedidos() {
 
 function guardarPedidos(pedidos) {
   fs.writeFileSync(PEDIDOS_FILE, JSON.stringify(pedidos, null, 2));
+}
+
+function leerFeedback() {
+  try {
+    const raw = fs.readFileSync(FEEDBACK_FILE, 'utf8');
+    const parsed = JSON.parse(raw || '[]');
+    if (Array.isArray(parsed)) return parsed;
+    return [];
+  } catch (e) {
+    console.error('Error leyendo feedback:', e);
+    return [];
+  }
+}
+
+function guardarFeedback(entries) {
+  fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(entries, null, 2));
+}
+
+function leerReviews(limit = 50) {
+  try {
+    const raw = fs.readFileSync(REVIEWS_FILE, 'utf8');
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed)) return [];
+    const sorted = parsed
+      .slice()
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    if (limit && Number.isFinite(limit)) return sorted.slice(0, limit);
+    return sorted;
+  } catch (e) {
+    console.error('Error leyendo reviews:', e);
+    return [];
+  }
+}
+
+function guardarReviews(entries) {
+  fs.writeFileSync(REVIEWS_FILE, JSON.stringify(entries, null, 2));
 }
 
 const ARCHIVE_TIMEZONE = process.env.ARCHIVE_TZ || 'America/Santiago';
@@ -545,6 +606,229 @@ app.get('/api/dbtest', async (req, res) => {
   } catch (err) {
     console.error('Error en /api/dbtest:', err.message || err);
     return res.status(500).json({ ok: false, db: false, error: err.message });
+  }
+});
+
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const email = typeof body.email === 'string' ? body.email.trim() : '';
+    const category = typeof body.category === 'string' ? body.category.trim() : '';
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
+
+    if (!name || !message) {
+      return res.status(400).json({ error: 'Nombre y mensaje son obligatorios.' });
+    }
+
+    if (message.length > 2000) {
+      return res.status(400).json({ error: 'El mensaje es demasiado largo.' });
+    }
+
+    const pool = app.locals.db;
+    const payload = {
+      name: name.slice(0, 200),
+      email: email.slice(0, 200) || null,
+      category: category.slice(0, 100) || null,
+      message,
+      metadata: Object.assign({}, metadata, {
+        source: metadata.source || 'web',
+        userAgent: req.headers['user-agent'] || null,
+        ip: req.headers['x-forwarded-for'] || (req.socket ? req.socket.remoteAddress : null) || null
+      })
+    };
+
+    if (pool) {
+      try {
+        const sql = `INSERT INTO feedback (name, email, category, message, metadata) VALUES ($1,$2,$3,$4,$5::jsonb)
+          RETURNING id, name, email, category, message, created_at`;
+        const params = [payload.name, payload.email, payload.category, payload.message, JSON.stringify(payload.metadata)];
+        const r = await pool.query(sql, params);
+        const row = r.rows[0];
+        return res.json({ status: 'ok', feedback: row });
+      } catch (err) {
+        console.error('[API] Error guardando feedback en DB:', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Error guardando feedback en DB' });
+      }
+    }
+
+    const entries = leerFeedback();
+    const newEntry = {
+      id: Date.now(),
+      name: payload.name,
+      email: payload.email,
+      category: payload.category,
+      message: payload.message,
+      created_at: new Date().toISOString(),
+      metadata: payload.metadata
+    };
+    entries.push(newEntry);
+    guardarFeedback(entries);
+    return res.json({ status: 'ok', feedback: newEntry });
+  } catch (err) {
+    console.error('[API] Error inesperado en POST /api/feedback', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/admin/feedback', async (req, res) => {
+  try {
+    const pool = app.locals.db;
+    if (pool) {
+      try {
+        const sql = `SELECT id, name, email, category, message, created_at FROM feedback ORDER BY created_at DESC LIMIT 500`;
+        const r = await pool.query(sql);
+        return res.json({ status: 'ok', feedback: r.rows });
+      } catch (err) {
+        console.error('[API] Error consultando feedback en DB:', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Error consultando feedback en DB' });
+      }
+    }
+
+    const entries = leerFeedback()
+      .slice()
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    return res.json({ status: 'ok', feedback: entries.slice(0, 500) });
+  } catch (err) {
+    console.error('[API] Error inesperado en GET /api/admin/feedback', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/reviews', async (req, res) => {
+  try {
+    const pool = app.locals.db;
+    if (pool) {
+      try {
+        const sql = `SELECT id, name, rating, comment, created_at FROM reviews ORDER BY created_at DESC LIMIT 50`;
+        const r = await pool.query(sql);
+        return res.json({ status: 'ok', reviews: r.rows });
+      } catch (err) {
+        console.error('[API] Error consultando reviews en DB:', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Error consultando reviews en DB' });
+      }
+    }
+
+    const entries = leerReviews(50);
+    return res.json({ status: 'ok', reviews: entries });
+  } catch (err) {
+    console.error('[API] Error inesperado en GET /api/reviews', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/reviews', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+    const rating = Number(body.rating);
+    const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
+
+    if (!name) {
+      return res.status(400).json({ error: 'El nombre es obligatorio.' });
+    }
+    if (!rating || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'La valoración debe ser un número entre 1 y 5.' });
+    }
+    if (!comment) {
+      return res.status(400).json({ error: 'El comentario es obligatorio.' });
+    }
+    if (comment.length > 1200) {
+      return res.status(400).json({ error: 'El comentario es demasiado largo.' });
+    }
+
+    const payload = {
+      name: name.slice(0, 200),
+      comment,
+      rating: Math.round(rating),
+      metadata: Object.assign({}, metadata, {
+        source: metadata.source || 'web-review',
+        userAgent: req.headers['user-agent'] || null
+      })
+    };
+
+    const pool = app.locals.db;
+    if (pool) {
+      try {
+        const sql = `INSERT INTO reviews (name, rating, comment, metadata) VALUES ($1,$2,$3,$4::jsonb)
+          RETURNING id, name, rating, comment, created_at`;
+        const params = [payload.name, payload.rating, payload.comment, JSON.stringify(payload.metadata)];
+        const r = await pool.query(sql, params);
+        return res.json({ status: 'ok', review: r.rows[0] });
+      } catch (err) {
+        console.error('[API] Error guardando review en DB:', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Error guardando review en DB' });
+      }
+    }
+
+    const entries = leerReviews();
+    const newEntry = {
+      id: Date.now(),
+      name: payload.name,
+      rating: payload.rating,
+      comment: payload.comment,
+      created_at: new Date().toISOString(),
+      metadata: payload.metadata
+    };
+    entries.unshift(newEntry);
+    guardarReviews(entries);
+    return res.json({ status: 'ok', review: newEntry });
+  } catch (err) {
+    console.error('[API] Error inesperado en POST /api/reviews', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/admin/reviews', async (req, res) => {
+  try {
+    const pool = app.locals.db;
+    if (pool) {
+      try {
+        const sql = `SELECT id, name, rating, comment, created_at FROM reviews ORDER BY created_at DESC LIMIT 500`;
+        const r = await pool.query(sql);
+        return res.json({ status: 'ok', reviews: r.rows });
+      } catch (err) {
+        console.error('[API] Error consultando reviews en DB (admin):', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Error consultando reviews en DB' });
+      }
+    }
+
+    const entries = leerReviews(500);
+    return res.json({ status: 'ok', reviews: entries });
+  } catch (err) {
+    console.error('[API] Error inesperado en GET /api/admin/reviews', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.delete('/api/admin/reviews/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID inválido' });
+    const pool = app.locals.db;
+    if (pool) {
+      try {
+        const sql = 'DELETE FROM reviews WHERE id = $1 RETURNING id';
+        const r = await pool.query(sql, [id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Valoración no encontrada' });
+        return res.json({ status: 'ok', removed: id });
+      } catch (err) {
+        console.error('[API] Error eliminando review en DB:', err && err.message ? err.message : err);
+        return res.status(500).json({ error: 'Error eliminando review en DB' });
+      }
+    }
+
+    const entries = leerReviews();
+    const idx = entries.findIndex(entry => Number(entry.id) === id);
+    if (idx === -1) return res.status(404).json({ error: 'Valoración no encontrada' });
+    entries.splice(idx, 1);
+    guardarReviews(entries);
+    return res.json({ status: 'ok', removed: id });
+  } catch (err) {
+    console.error('[API] Error inesperado en DELETE /api/admin/reviews/:id', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 

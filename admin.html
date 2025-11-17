@@ -113,6 +113,78 @@
       vertical-align: middle;
     }
 
+    .feedback-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .feedback-table,
+    .reviews-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .feedback-table th,
+    .feedback-table td,
+    .reviews-table th,
+    .reviews-table td {
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(11, 94, 42, 0.08);
+      vertical-align: top;
+    }
+
+    .feedback-table tbody tr:hover,
+    .reviews-table tbody tr:hover {
+      background: rgba(24, 148, 76, 0.06);
+    }
+
+    .feedback-message {
+      white-space: pre-wrap;
+      color: #1d3326;
+    }
+
+    .review-comment {
+      white-space: pre-wrap;
+      color: #1d3326;
+    }
+
+    .feedback-status {
+      margin: 0;
+      font-weight: 600;
+      color: #0b5a2a;
+    }
+
+    .feedback-status.error {
+      color: #a52626;
+    }
+
+    .feedback-empty {
+      margin: 18px 0 0;
+      color: #1d3326;
+      font-weight: 500;
+    }
+
+    .reviews-status {
+      margin: 0;
+      font-weight: 600;
+      color: #0b5a2a;
+    }
+
+    .reviews-status.error {
+      color: #a52626;
+    }
+
+    .reviews-empty {
+      margin: 18px 0 0;
+      color: #1d3326;
+      font-weight: 500;
+    }
+
     @media (max-width: 900px) {
       body.admin-page {
         padding: 32px 12px;
@@ -195,10 +267,76 @@
       </div>
       <div id="categoriesContainer" class="categories-container"></div>
     </section>
+
+    <section class="admin-section" id="feedbackSection">
+      <div class="section-header">
+        <h2>Comentarios y Quejas</h2>
+        <p style="margin:0;color:#3f6b50;font-size:0.95rem;">Mensajes recibidos desde el formulario de contacto.</p>
+      </div>
+      <div class="feedback-controls">
+        <p class="feedback-status" id="feedbackStatus">Cargando mensajes...</p>
+        <button type="button" class="admin-button" id="refreshFeedback">Actualizar</button>
+      </div>
+      <div id="feedbackEmpty" class="feedback-empty" style="display:none;">Aún no se han recibido comentarios.</div>
+      <div class="table-container" id="feedbackTableWrapper" style="display:none;">
+        <table class="feedback-table">
+          <thead>
+            <tr>
+              <th style="width:18%;">Fecha</th>
+              <th style="width:18%;">Nombre</th>
+              <th style="width:20%;">Correo</th>
+              <th style="width:14%;">Tipo</th>
+              <th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody id="feedbackTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="admin-section" id="reviewsSection">
+      <div class="section-header">
+        <h2>Valoraciones de Usuarios</h2>
+        <p style="margin:0;color:#3f6b50;font-size:0.95rem;">Control de reseñas enviadas desde la página principal.</p>
+      </div>
+      <div class="feedback-controls">
+        <p class="reviews-status" id="reviewsStatus">Cargando valoraciones...</p>
+        <button type="button" class="admin-button" id="refreshReviews">Actualizar</button>
+      </div>
+      <div id="reviewsEmpty" class="reviews-empty" style="display:none;">Sin valoraciones registradas.</div>
+      <div class="table-container" id="reviewsTableWrapper" style="display:none;">
+        <table class="reviews-table">
+          <thead>
+            <tr>
+              <th style="width:18%;">Fecha</th>
+              <th style="width:22%;">Nombre</th>
+              <th style="width:12%;">Estrellas</th>
+              <th>Comentario</th>
+              <th style="width:12%;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="reviewsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <script>
     const IMG_MAX = 200; // longitud máxima para URL imagen
+    const FEEDBACK_MAX_ROWS = 500;
+
+    let feedbackStatusEl = null;
+    let feedbackTableWrapper = null;
+    let feedbackTableBody = null;
+    let feedbackEmptyEl = null;
+    let feedbackLoading = false;
+    let refreshFeedbackButtonEl = null;
+    let reviewsStatusEl = null;
+    let reviewsTableWrapper = null;
+    let reviewsTableBody = null;
+    let reviewsEmptyEl = null;
+    let reviewsLoading = false;
+    let refreshReviewsButtonEl = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       const nuevoImg = document.getElementById('nuevoImg');
@@ -208,9 +346,38 @@
           nuevoImg.title = nuevoImg.value || '';
         });
       }
+      refreshFeedbackButtonEl = document.getElementById('refreshFeedback');
+      feedbackStatusEl = document.getElementById('feedbackStatus');
+      feedbackTableWrapper = document.getElementById('feedbackTableWrapper');
+      feedbackTableBody = document.getElementById('feedbackTableBody');
+      feedbackEmptyEl = document.getElementById('feedbackEmpty');
+
+      if (refreshFeedbackButtonEl) {
+        refreshFeedbackButtonEl.addEventListener('click', () => {
+          loadFeedback();
+        });
+      }
+
+      refreshReviewsButtonEl = document.getElementById('refreshReviews');
+      reviewsStatusEl = document.getElementById('reviewsStatus');
+      reviewsTableWrapper = document.getElementById('reviewsTableWrapper');
+      reviewsTableBody = document.getElementById('reviewsTableBody');
+      reviewsEmptyEl = document.getElementById('reviewsEmpty');
+
+      if (refreshReviewsButtonEl) {
+        refreshReviewsButtonEl.addEventListener('click', () => {
+          loadReviews();
+        });
+      }
+
       load();
       checkDbStatus();
-      ensureAdmin();
+      ensureAdmin().then(isAdmin => {
+        if (isAdmin) {
+          loadFeedback();
+          loadReviews();
+        }
+      });
     });
 
     async function ensureAdmin(){
@@ -319,6 +486,214 @@
         }
         div.title = div.textContent;
       });
+    }
+
+    function formatFeedbackDate(value) {
+      if (!value) return '-';
+      try {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString('es-CL', {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return value;
+      }
+    }
+
+    function formatFeedbackCategory(value) {
+      if (!value) return 'General';
+      const map = {
+        consulta: 'Consulta general',
+        error: 'Reporte de error',
+        sugerencia: 'Sugerencia',
+        queja: 'Queja'
+      };
+      const key = String(value).toLowerCase();
+      return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
+    }
+
+    function renderFeedbackRows(entries) {
+      if (!feedbackTableBody || !feedbackTableWrapper || !feedbackEmptyEl) return;
+      feedbackTableBody.innerHTML = '';
+
+      if (!entries || !entries.length) {
+        feedbackTableWrapper.style.display = 'none';
+        feedbackEmptyEl.style.display = 'block';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      entries.forEach(entry => {
+        const tr = document.createElement('tr');
+
+        const dateCell = document.createElement('td');
+        dateCell.textContent = formatFeedbackDate(entry.created_at);
+        tr.appendChild(dateCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = entry.name || 'Sin nombre';
+        tr.appendChild(nameCell);
+
+        const emailCell = document.createElement('td');
+        emailCell.textContent = entry.email || '-';
+        tr.appendChild(emailCell);
+
+        const categoryCell = document.createElement('td');
+        categoryCell.textContent = formatFeedbackCategory(entry.category);
+        tr.appendChild(categoryCell);
+
+        const messageCell = document.createElement('td');
+        messageCell.className = 'feedback-message';
+        messageCell.textContent = entry.message || '';
+        tr.appendChild(messageCell);
+
+        fragment.appendChild(tr);
+      });
+
+      feedbackTableBody.appendChild(fragment);
+      feedbackEmptyEl.style.display = 'none';
+      feedbackTableWrapper.style.display = 'block';
+    }
+
+    async function loadFeedback() {
+      if (feedbackLoading) return;
+      if (!feedbackTableBody) return;
+      feedbackLoading = true;
+      if (refreshFeedbackButtonEl) refreshFeedbackButtonEl.disabled = true;
+      if (feedbackStatusEl) {
+        feedbackStatusEl.textContent = 'Cargando mensajes...';
+        feedbackStatusEl.classList.remove('error');
+      }
+      try {
+        const res = await fetch('/api/admin/feedback', { credentials: 'same-origin' });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || 'No se pudieron cargar los comentarios');
+        }
+        const data = await res.json();
+        const list = Array.isArray(data.feedback) ? data.feedback.slice(0, FEEDBACK_MAX_ROWS) : [];
+        renderFeedbackRows(list);
+        if (feedbackStatusEl) {
+          feedbackStatusEl.textContent = `Última actualización: ${formatFeedbackDate(new Date().toISOString())}`;
+          feedbackStatusEl.classList.remove('error');
+        }
+      } catch (err) {
+        console.error('Error cargando feedback:', err);
+        if (feedbackStatusEl) {
+          feedbackStatusEl.textContent = err.message || 'Error al cargar comentarios';
+          feedbackStatusEl.classList.add('error');
+        }
+      } finally {
+        feedbackLoading = false;
+        if (refreshFeedbackButtonEl) refreshFeedbackButtonEl.disabled = false;
+      }
+    }
+
+    function renderReviewsRows(entries) {
+      if (!reviewsTableBody || !reviewsTableWrapper || !reviewsEmptyEl) return;
+      reviewsTableBody.innerHTML = '';
+
+      if (!entries || !entries.length) {
+        reviewsTableWrapper.style.display = 'none';
+        reviewsEmptyEl.style.display = 'block';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      entries.forEach(entry => {
+        const tr = document.createElement('tr');
+
+        const dateCell = document.createElement('td');
+        dateCell.textContent = formatFeedbackDate(entry.created_at);
+        tr.appendChild(dateCell);
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = entry.name || 'Anónimo';
+        tr.appendChild(nameCell);
+
+        const ratingCell = document.createElement('td');
+        ratingCell.textContent = `${entry.rating || 0} ★`;
+        tr.appendChild(ratingCell);
+
+        const commentCell = document.createElement('td');
+        commentCell.className = 'review-comment';
+        commentCell.textContent = entry.comment || '';
+        tr.appendChild(commentCell);
+
+        const actionsCell = document.createElement('td');
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'admin-button admin-button-danger';
+        deleteBtn.textContent = 'Eliminar';
+        deleteBtn.addEventListener('click', () => {
+          if (!confirm('¿Eliminar esta valoración?')) return;
+          deleteReview(entry.id);
+        });
+        actionsCell.appendChild(deleteBtn);
+        tr.appendChild(actionsCell);
+
+        fragment.appendChild(tr);
+      });
+
+      reviewsTableBody.appendChild(fragment);
+      reviewsEmptyEl.style.display = 'none';
+      reviewsTableWrapper.style.display = 'block';
+    }
+
+    async function loadReviews() {
+      if (reviewsLoading) return;
+      if (!reviewsTableBody) return;
+      reviewsLoading = true;
+      if (refreshReviewsButtonEl) refreshReviewsButtonEl.disabled = true;
+      if (reviewsStatusEl) {
+        reviewsStatusEl.textContent = 'Cargando valoraciones...';
+        reviewsStatusEl.classList.remove('error');
+      }
+      try {
+        const res = await fetch('/api/admin/reviews', { credentials: 'same-origin' });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || 'No se pudieron cargar las valoraciones');
+        }
+        const data = await res.json();
+        const list = Array.isArray(data.reviews) ? data.reviews : [];
+        renderReviewsRows(list);
+        if (reviewsStatusEl) {
+          reviewsStatusEl.textContent = `Última actualización: ${formatFeedbackDate(new Date().toISOString())}`;
+          reviewsStatusEl.classList.remove('error');
+        }
+      } catch (err) {
+        console.error('Error cargando valoraciones:', err);
+        if (reviewsStatusEl) {
+          reviewsStatusEl.textContent = err.message || 'Error al cargar valoraciones';
+          reviewsStatusEl.classList.add('error');
+        }
+      } finally {
+        reviewsLoading = false;
+        if (refreshReviewsButtonEl) refreshReviewsButtonEl.disabled = false;
+      }
+    }
+
+    async function deleteReview(id) {
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/admin/reviews/${id}`, {
+          method: 'DELETE',
+          credentials: 'same-origin'
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || 'No se pudo eliminar la valoración');
+        }
+        await loadReviews();
+      } catch (err) {
+        console.error('Error eliminando valoración:', err);
+        alert(err.message || 'No se pudo eliminar la valoración');
+      }
     }
 
     function createProductRow(product, categories, onSaved) {
