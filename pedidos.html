@@ -62,10 +62,10 @@
         <div style="background:#fafafa;border:1px solid #eee;padding:8px;border-radius:8px;">
           <table id="archivesTable" style="width:100%;border-collapse:collapse;font-size:0.95rem;">
             <thead>
-              <tr style="text-align:left;color:#063;font-weight:700"><th style="padding:6px 8px">Fecha</th><th style="padding:6px 8px">Pedidos</th><th style="padding:6px 8px">Archivado por</th><th style="padding:6px 8px">Acciones</th></tr>
+              <tr style="text-align:left;color:#063;font-weight:700"><th style="padding:6px 8px">Fecha</th><th style="padding:6px 8px">Pedidos</th><th style="padding:6px 8px">Total</th><th style="padding:6px 8px">Archivado por</th><th style="padding:6px 8px">Acciones</th></tr>
             </thead>
             <tbody id="archivesBody">
-              <tr><td colspan="4" style="padding:8px;color:#666">Cargando listas archivadas...</td></tr>
+              <tr><td colspan="5" style="padding:8px;color:#666">Cargando listas archivadas...</td></tr>
             </tbody>
           </table>
         </div>
@@ -86,6 +86,12 @@
     // admin-only page: verify session first
     let isViewingArchive = false;
     let currentArchiveDate = null;
+    const currencyFormatter = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+
+    function formatCurrency(value) {
+      try { return currencyFormatter.format(Number(value || 0)); }
+      catch (e) { return '$' + Number(value || 0).toFixed(0); }
+    }
 
     async function ensureAdmin() {
       try{
@@ -132,8 +138,10 @@
       (pedidos||[]).slice().reverse().forEach(p=>{
         const tr = document.createElement('tr');
         const itemsHTML = (p.items||[]).map(i=> (i.cantidad||i.qty||1) + ' x ' + (i.nombre||i.name||i.product_code||i.product_code||'' )).join('<br>');
-        const source = (p.metadata && p.metadata.source) || p.source || p.origin || (p.paymentIntentId? 'mobile' : 'web') || 'web';
+        const rawSource = (p.metadata && p.metadata.source) || p.source || p.origin || (p.paymentIntentId? 'mobile' : 'web') || 'web';
+        const source = String(rawSource || '').toLowerCase() || 'web';
         const sourceClass = source === 'mobile' ? 'origin-mobile' : (source === 'web' ? 'origin-web' : 'origin-unknown');
+        const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
         const estadoRaw = String(p.estado||p.status||'').trim();
         const estadoSafe = estadoRaw.toLowerCase();
         let estadoClass = 'status-pendiente';
@@ -142,9 +150,9 @@
         tr.innerHTML = `
           <td>${p.id}</td>
           <td>${p.cliente || p.customer_name || ''}<div class="small">${p.email || (p.metadata&&p.metadata.email) || ''}</div></td>
-          <td><span class="origin-badge ${sourceClass}">${source}</span></td>
+          <td><span class="origin-badge ${sourceClass}">${sourceLabel}</span></td>
           <td>${itemsHTML}</td>
-          <td>$${p.total}</td>
+          <td>${formatCurrency(p.total)}</td>
           <td>${new Date(p.fecha || p.created_at || p.archived_at || Date.now()).toLocaleString()}</td>
           <td id="estado-${p.id}"><span class="status-badge ${estadoClass}">${estadoRaw}</span></td>
           <td class="actions">
@@ -204,10 +212,14 @@
         const body = document.getElementById('archivesBody');
         body.innerHTML = '';
         (j.archives||[]).forEach(a=>{
+          const totalText = a.summary && typeof a.summary.totalAmount !== 'undefined'
+            ? formatCurrency(a.summary.totalAmount)
+            : '-';
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td style="padding:8px;border-bottom:1px solid #eee">${a.date}</td>
             <td style="padding:8px;border-bottom:1px solid #eee">${a.count || 0}</td>
+            <td style="padding:8px;border-bottom:1px solid #eee">${totalText}</td>
             <td style="padding:8px;border-bottom:1px solid #eee">${a.archived_by || '-'}</td>
             <td style="padding:8px;border-bottom:1px solid #eee">
               <button class="btn" data-archive-view="${a.date}">Ver</button>
@@ -216,7 +228,7 @@
           `;
           body.appendChild(tr);
         });
-        if (!(j.archives||[]).length) body.innerHTML = '<tr><td colspan="4" style="padding:8px;color:#666">No hay listas archivadas</td></tr>';
+        if (!(j.archives||[]).length) body.innerHTML = '<tr><td colspan="5" style="padding:8px;color:#666">No hay listas archivadas</td></tr>';
       }catch(e){ console.warn('fetchArchives error', e); }
     }
 
@@ -229,9 +241,14 @@
         isViewingArchive = true; currentArchiveDate = date;
         document.getElementById('btnShowLive').style.display = 'inline-block';
         document.getElementById('btnArchiveToday').style.display = 'none';
-        document.getElementById('archiveInfo').textContent = 'Mostrando lista archivada: ' + date;
+        const summary = j.summary || null;
+        if (summary) {
+          document.getElementById('archiveInfo').textContent = `Mostrando lista archivada ${date} — Pedidos: ${summary.totalOrders} · Total: ${formatCurrency(summary.totalAmount)}`;
+        } else {
+          document.getElementById('archiveInfo').textContent = 'Mostrando lista archivada: ' + date;
+        }
         // map archived orders to a uniform structure
-        const orders = (j.orders||[]).map(o=>({ id: o.id || o.original_order_id || o.id, cliente: (o.metadata&&o.metadata.customer_name) || o.customer_name || o.customer || '', items: o.items || [], total: o.total || 0, fecha: o.archived_at || o.created_at || null, estado: o.status || 'archivado', metadata: o.metadata || {} }));
+        const orders = (j.orders||[]).map(o=>({ id: o.id || o.original_order_id || o.id, cliente: o.cliente || (o.metadata&&o.metadata.customer_name) || o.customer_name || o.customer || '', items: o.items || [], total: o.total || 0, fecha: o.archived_at || o.created_at || null, estado: o.estado || o.status || 'archivado', metadata: o.metadata || {}, source: (o.metadata && o.metadata.source) || o.source || null }));
         renderPedidos(orders);
       }catch(e){ console.error('loadArchive error', e); alert('Error cargando archive'); }
     }
@@ -243,9 +260,8 @@
         if (!r.ok) { const err = await r.json().catch(()=>({})); alert('Error archivando: '+(err.error||r.status)); return; }
         const j = await r.json();
         await fetchArchives();
-        if (j.archived_at) {
-          // try to load the archived date
-          const d = (j.archived_at||'').slice(0,10);
+        if (j.archive_date || j.archived_at) {
+          const d = j.archive_date || (j.archived_at||'').slice(0,10);
           if (d) { await loadArchive(d); return; }
         }
         alert('Archivado completado. Refresca la lista para ver cambios.');

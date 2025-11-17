@@ -69,6 +69,20 @@ const USE_DB_ONLY = process.env.USE_DB_ONLY === 'true' || process.env.FORCE_DB =
 // Inicializar Pool de Postgres si 'pg' fue cargado y existe DATABASE_URL
 if (pgPool) {
   app.locals.db = pgPool;
+  (async () => {
+    try {
+      await pgPool.query(`CREATE TABLE IF NOT EXISTS order_archives (
+        archive_date date PRIMARY KEY,
+        archived_at timestamptz NOT NULL,
+        archived_by text,
+        orders jsonb NOT NULL,
+        summary jsonb
+      )`);
+      console.log('[INIT] Tabla order_archives verificada.');
+    } catch (e) {
+      console.error('[INIT] No se pudo verificar/crear order_archives:', e.message || e);
+    }
+  })();
 } else {
   console.log('Postgres no inicializado (pg ausente o DATABASE_URL no definida) — usando JSON local.');
 }
@@ -222,32 +236,162 @@ function guardarPedidos(pedidos) {
   fs.writeFileSync(PEDIDOS_FILE, JSON.stringify(pedidos, null, 2));
 }
 
+const ARCHIVE_TIMEZONE = process.env.ARCHIVE_TZ || 'America/Santiago';
+const archiveDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: ARCHIVE_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
+function normalizeArchiveDate(inputDate) {
+  if (inputDate && /^\d{4}-\d{2}-\d{2}$/.test(String(inputDate))) return String(inputDate);
+  const baseDate = inputDate ? new Date(inputDate) : new Date();
+  return archiveDateFormatter.format(baseDate);
+}
+
+function snapshotOrderData(orderRow = {}) {
+  const metadata = orderRow.metadata && typeof orderRow.metadata === 'object'
+    ? orderRow.metadata
+    : {};
+
+  let items = orderRow.items;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); } catch (e) { items = []; }
+  }
+  if (!Array.isArray(items)) items = [];
+
+  return {
+    id: orderRow.id || orderRow.original_order_id || null,
+    external_id: orderRow.external_id || metadata.sessionId || null,
+    cliente: orderRow.customer_name || orderRow.cliente || metadata.cliente || metadata.customer_name || null,
+    email: orderRow.email || metadata.email || null,
+    items,
+    total: Number(orderRow.total || orderRow.monto || 0),
+    estado: orderRow.status || orderRow.estado || metadata.estado || 'pendiente',
+    metodoPago: metadata.metodoPago || orderRow.metodoPago || null,
+    nota: metadata.nota || orderRow.nota || null,
+    source: metadata.source || orderRow.source || null,
+    paymentIntentId: metadata.paymentIntentId || orderRow.paymentIntentId || null,
+    created_at: orderRow.created_at || orderRow.fecha || null,
+    updated_at: orderRow.updated_at || null,
+    metadata
+  };
+}
+
+function summarizeOrders(orders = []) {
+  const summary = {
+    totalOrders: orders.length,
+    totalAmount: 0,
+    byStatus: {},
+    byPaymentMethod: {},
+    bySource: {},
+    topProducts: []
+  };
+  const productTotals = new Map();
+
+  orders.forEach(order => {
+    const total = Number(order.total || 0);
+    summary.totalAmount += total;
+    const status = (order.estado || 'desconocido').toLowerCase();
+    summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
+    const metodo = (order.metodoPago || 'desconocido').toLowerCase();
+    summary.byPaymentMethod[metodo] = (summary.byPaymentMethod[metodo] || 0) + 1;
+    const source = (order.source || 'desconocido').toLowerCase();
+    summary.bySource[source] = (summary.bySource[source] || 0) + 1;
+
+    (order.items || []).forEach(item => {
+      const key = (item.nombre || item.name || item.product_code || 'sin_nombre').toLowerCase();
+      const qty = Number(item.cantidad || item.qty || 1);
+      const amount = Number(item.precio || item.price || 0) * qty;
+      const existing = productTotals.get(key) || { nombre: key, cantidad: 0, total: 0 };
+      existing.cantidad += qty;
+      existing.total += amount;
+      existing.nombre = item.nombre || item.name || key;
+      productTotals.set(key, existing);
+    });
+  });
+
+  summary.topProducts = Array.from(productTotals.values())
+    .sort((a, b) => b.cantidad - a.cantidad)
+    .slice(0, 10);
+
+  summary.totalAmount = Number(summary.totalAmount.toFixed(2));
+  return summary;
+}
+
 // ------------------------------------------------------------------
 // NUEVA FUNCIÓN: Archivar pedidos del día y limpiar la lista principal
 // ------------------------------------------------------------------
-function archivarYLimpiarPedidos(archived_by = 'system') {
+function archivarYLimpiarPedidos(archived_by = 'system', archiveDateInput = null) {
   const pedidosActuales = leerPedidos();
   if (pedidosActuales.length === 0) {
     console.log('No hay pedidos para archivar.');
     return { archivar: false, count: 0 };
   }
 
-  // Generar nombre de archivo con la fecha actual (ej: 2025-10-27.json)
-  const fecha = new Date().toISOString().split('T')[0];
+  const fecha = normalizeArchiveDate(archiveDateInput);
   const archivoArchivado = path.join(ARCHIVE_DIR, `${fecha}.json`);
-
-  // Guardar los pedidos actuales en el archivo diario junto a metadatos
+  const ordersSnapshot = pedidosActuales.map(p => snapshotOrderData(p));
+  const summary = summarizeOrders(ordersSnapshot);
   const payload = {
+    archive_date: fecha,
     archived_at: new Date().toISOString(),
     archived_by: archived_by || 'system',
-    orders: pedidosActuales
+    orders: ordersSnapshot,
+    summary
   };
   fs.writeFileSync(archivoArchivado, JSON.stringify(payload, null, 2));
 
-  // Limpiar el archivo de pedidos principal
   guardarPedidos([]);
-  console.log(`Archivados ${pedidosActuales.length} pedidos en ${archivoArchivado} y limpiada la lista principal.`);
-  return { archivar: true, count: pedidosActuales.length, archivo: archivoArchivado, payload };
+  console.log(`Archivados ${ordersSnapshot.length} pedidos en ${archivoArchivado} y limpiada la lista principal.`);
+  return { archivar: true, count: ordersSnapshot.length, archivo: archivoArchivado, payload };
+}
+
+async function archiveOrdersInDb(pool, actor, archiveDate) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const selectSql = `SELECT * FROM orders ORDER BY created_at ASC`;
+    const r = await client.query(selectSql);
+    if (!r.rows || r.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return { archived: 0, archive_date: archiveDate, archived_at: null, summary: null };
+    }
+
+    const archivedAt = new Date().toISOString();
+    const ordersSnapshot = r.rows.map(row => snapshotOrderData(row));
+    const summary = summarizeOrders(ordersSnapshot);
+    const insertSql = `INSERT INTO archived_orders (original_order_id, items, total, archived_at, metadata)
+      VALUES ($1, $2::jsonb, $3, $4, $5::jsonb)`;
+
+    for (const snap of ordersSnapshot) {
+      const metadataObj = Object.assign({}, snap.metadata || {}, {
+        archived_by: actor,
+        original_order_id: snap.id,
+        archive_date: archiveDate,
+        order_snapshot: snap
+      });
+      const params = [null, JSON.stringify(snap.items || []), snap.total || 0, archivedAt, JSON.stringify(metadataObj)];
+      await client.query(insertSql, params);
+    }
+
+    const upsertArchiveList = `INSERT INTO order_archives (archive_date, archived_at, archived_by, orders, summary)
+      VALUES ($1, $2, $3, $4::jsonb, $5::jsonb)
+      ON CONFLICT (archive_date)
+      DO UPDATE SET archived_at = EXCLUDED.archived_at, archived_by = EXCLUDED.archived_by, orders = EXCLUDED.orders, summary = EXCLUDED.summary`;
+    await client.query(upsertArchiveList, [archiveDate, archivedAt, actor, JSON.stringify(ordersSnapshot), JSON.stringify(summary)]);
+
+    await client.query('DELETE FROM orders');
+    await client.query('COMMIT');
+
+    return { archived: ordersSnapshot.length, archive_date: archiveDate, archived_at: archivedAt, summary };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(()=>{});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 
@@ -414,57 +558,27 @@ app.get('/api/dbtest', async (req, res) => {
 // Si no, usamos el fallback de archivos JSON (archivarYLimpiarPedidos).
 app.post('/api/admin/archive-today', async (req, res) => {
   const pool = app.locals.db;
-    if (!pool) {
+  const requestedDate = req.body && req.body.date ? String(req.body.date) : null;
+  const archiveDate = normalizeArchiveDate(requestedDate);
+  const actor = req.session && req.session.admin ? (req.session.admin.name || req.session.admin.email || 'admin') : 'admin';
+
+  if (!pool) {
     try {
-      const actor = req.session && req.session.admin ? (req.session.admin.name || req.session.admin.email || 'admin') : 'admin';
-      const result = archivarYLimpiarPedidos(actor);
-      return res.json({ ok: true, method: 'file', result });
+      const result = archivarYLimpiarPedidos(actor, archiveDate);
+      return res.json({ ok: true, method: 'file', archive_date: archiveDate, archived_at: result.payload.archived_at, archived: result.count, summary: result.payload.summary });
     } catch (e) {
       console.error('Error archivando pedidos (file):', e);
       return res.status(500).json({ ok: false, error: e.message });
     }
   }
 
-  // DB path
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    // Select orders from today
-    const selectSql = `SELECT * FROM orders WHERE DATE(created_at) = CURRENT_DATE`;
-    const r = await client.query(selectSql);
-    if (!r.rows || r.rows.length === 0) {
-      await client.query('COMMIT');
-      return res.json({ ok: true, archived: 0, message: 'No hay pedidos del día para archivar' });
-    }
-
-    const now = new Date();
-    const insertSql = `INSERT INTO archived_orders (original_order_id, items, total, archived_at, metadata)
-      VALUES ($1, $2::jsonb, $3, $4, $5) RETURNING id`;
-
-    let count = 0;
-    for (const row of r.rows) {
-      // To avoid foreign-key constraint violations (archived_orders.original_order_id -> orders.id)
-      // we store the original order id inside metadata and pass NULL for original_order_id.
-      const actor = req.session && req.session.admin ? (req.session.admin.name || req.session.admin.email || 'admin') : 'admin';
-      const metadataObj = Object.assign({}, row.metadata || {}, { archived_by: actor, original_order_id: row.id });
-      const params = [null, JSON.stringify(row.items || []), row.total || 0, now.toISOString(), JSON.stringify(metadataObj)];
-      await client.query(insertSql, params);
-      count++;
-    }
-
-    // Delete archived orders from orders table
-    const ids = r.rows.map(x => x.id);
-    const delSql = `DELETE FROM orders WHERE id = ANY($1::int[])`;
-    await client.query(delSql, [ids]);
-
-    await client.query('COMMIT');
-    return res.json({ ok: true, archived: count, archived_at: now.toISOString() });
+    const result = await archiveOrdersInDb(pool, actor, archiveDate);
+    if (!result.archived) return res.json({ ok: true, archived: 0, archive_date: archiveDate, message: 'No hay pedidos activos para archivar' });
+    return res.json({ ok: true, ...result });
   } catch (e) {
-    await client.query('ROLLBACK').catch(()=>{});
     console.error('Error archivando pedidos (db):', e.message || e);
     return res.status(500).json({ ok: false, error: e.message || String(e) });
-  } finally {
-    client.release();
   }
 });
 
@@ -482,32 +596,40 @@ app.get('/api/admin/archives', async (req, res) => {
           const raw = fs.readFileSync(path.join(ARCHIVE_DIR, f));
           const obj = JSON.parse(raw);
           const orders = Array.isArray(obj.orders) ? obj.orders : [];
-          return { date: f.replace(/\.json$/, ''), count: orders.length, archived_by: obj.archived_by || 'system', archived_at: obj.archived_at || null, file: f };
-        } catch (e) { return { date: f.replace(/\.json$/, ''), count: 0, archived_by: null, file: f }; }
+          return {
+            date: f.replace(/\.json$/, ''),
+            count: orders.length,
+            archived_by: obj.archived_by || 'system',
+            archived_at: obj.archived_at || null,
+            summary: obj.summary || null,
+            file: f
+          };
+        } catch (e) {
+          return { date: f.replace(/\.json$/, ''), count: 0, archived_by: null, file: f };
+        }
       }).sort((a,b)=> b.date.localeCompare(a.date));
       return res.json({ ok: true, method: 'file', archives: list });
     } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   }
 
-  // DB-based: agrupar archived_orders por fecha
+  // DB-based: preferir tabla order_archives con snapshot completo
   try {
-    const q = `SELECT to_char(archived_at::date, 'YYYY-MM-DD') AS date, count(*)::int AS count
-      FROM archived_orders GROUP BY date ORDER BY date DESC`;
+    const q = `SELECT archive_date::text AS date, archived_at, archived_by, jsonb_array_length(orders)::int AS count, summary
+      FROM order_archives ORDER BY archive_date DESC`;
     const r = await pool.query(q);
-    // try to enrich with archived_by if possible
-    const augmented = r.rows.map(row => Object.assign({}, row, { archived_by: null }));
+    return res.json({ ok: true, method: 'db', archives: r.rows });
+  } catch (e) {
+    console.error('Error listando order_archives, intentando fallback en archived_orders:', e.message || e);
     try {
-      const detailsQ = `SELECT archived_at, metadata FROM archived_orders WHERE DATE(archived_at) = $1 LIMIT 1`;
-      for (const a of augmented) {
-        const det = await pool.query(detailsQ, [a.date]);
-        if (det && det.rows && det.rows[0]) {
-          a.archived_at = det.rows[0].archived_at;
-          a.archived_by = det.rows[0].metadata && det.rows[0].metadata.archived_by ? det.rows[0].metadata.archived_by : null;
-        }
-      }
-    } catch (e) { /* ignore details enrichment errors */ }
-    return res.json({ ok: true, method: 'db', archives: augmented });
-  } catch (e) { console.error('Error listando archives:', e.message || e); return res.status(500).json({ ok:false, error: e.message }); }
+      const fallbackQ = `SELECT to_char(archived_at::date, 'YYYY-MM-DD') AS date, count(*)::int AS count
+        FROM archived_orders GROUP BY date ORDER BY date DESC`;
+      const r = await pool.query(fallbackQ);
+      return res.json({ ok: true, method: 'db-fallback', archives: r.rows });
+    } catch (err) {
+      console.error('Error listando archives (fallback):', err.message || err);
+      return res.status(500).json({ ok:false, error: err.message });
+    }
+  }
 });
 
 
@@ -524,14 +646,33 @@ app.get('/api/admin/archives/:date', async (req, res) => {
       const raw = fs.readFileSync(filePath);
       const obj = JSON.parse(raw);
       const orders = Array.isArray(obj.orders) ? obj.orders : [];
-      return res.json({ ok: true, method: 'file', date, archived_at: obj.archived_at || null, archived_by: obj.archived_by || null, orders });
+      return res.json({ ok: true, method: 'file', date, archived_at: obj.archived_at || null, archived_by: obj.archived_by || null, summary: obj.summary || null, orders });
     } catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
   }
 
   try {
-    const q = `SELECT id, original_order_id, items, total, archived_at, metadata FROM archived_orders WHERE DATE(archived_at) = $1 ORDER BY archived_at DESC`;
+    const q = `SELECT archive_date::text AS date, archived_at, archived_by, orders, summary FROM order_archives WHERE archive_date = $1 LIMIT 1`;
     const r = await pool.query(q, [date]);
-    return res.json({ ok: true, method: 'db', date, archived_at: date, archived_by: null, orders: r.rows });
+    if (r.rows && r.rows.length) {
+      const row = r.rows[0];
+      return res.json({ ok: true, method: 'db', date, archived_at: row.archived_at, archived_by: row.archived_by, summary: row.summary || null, orders: row.orders || [] });
+    }
+    // fallback to archived_orders if order_archives entry missing
+    const fallbackQ = `SELECT original_order_id, items, total, archived_at, metadata FROM archived_orders WHERE DATE(archived_at) = $1 ORDER BY archived_at DESC`;
+    const fallbackRows = await pool.query(fallbackQ, [date]);
+    const orders = fallbackRows.rows.map(row => {
+      if (row.metadata && row.metadata.order_snapshot) return row.metadata.order_snapshot;
+      return snapshotOrderData({
+        id: row.original_order_id,
+        items: row.items,
+        total: row.total,
+        status: row.metadata && row.metadata.status,
+        customer_name: row.metadata && row.metadata.customer_name,
+        metadata: row.metadata,
+        created_at: row.archived_at
+      });
+    });
+    return res.json({ ok: true, method: 'db-fallback', date, archived_at: date, archived_by: null, orders });
   } catch (e) { console.error('Error obteniendo archive date:', e.message || e); return res.status(500).json({ ok:false, error: e.message }); }
 });
 
@@ -551,11 +692,20 @@ app.delete('/api/admin/archives/:date', async (req, res) => {
     } catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
   }
 
+  const client = await pool.connect();
   try {
-    const delQ = `DELETE FROM archived_orders WHERE DATE(archived_at) = $1`;
-    const r = await pool.query(delQ, [date]);
-    return res.json({ ok: true, method: 'db', date, deleted: r.rowCount });
-  } catch (e) { console.error('Error eliminando archived_orders:', e.message || e); return res.status(500).json({ ok:false, error: e.message }); }
+    await client.query('BEGIN');
+    const delArchiveList = await client.query('DELETE FROM order_archives WHERE archive_date = $1', [date]);
+    const delOrders = await client.query('DELETE FROM archived_orders WHERE DATE(archived_at) = $1', [date]);
+    await client.query('COMMIT');
+    return res.json({ ok: true, method: 'db', date, deleted_lists: delArchiveList.rowCount, deleted_orders: delOrders.rowCount });
+  } catch (e) {
+    await client.query('ROLLBACK').catch(()=>{});
+    console.error('Error eliminando archived_orders/order_archives:', e.message || e);
+    return res.status(500).json({ ok:false, error: e.message });
+  } finally {
+    client.release();
+  }
 });
 
 // Crear nuevo producto
@@ -1256,7 +1406,9 @@ app.get('/api/pedidos', async (req, res) => {
         estado: row.status,
         paymentIntentId: row.metadata && row.metadata.paymentIntentId ? row.metadata.paymentIntentId : null,
         sessionId: row.external_id || (row.metadata && row.metadata.sessionId ? row.metadata.sessionId : null),
-        fecha: row.created_at
+        fecha: row.created_at,
+        source: row.metadata && row.metadata.source ? row.metadata.source : null,
+        metadata: row.metadata || {}
       }));
       return res.json(rows);
     } catch (err) {
@@ -1652,16 +1804,32 @@ app.post('/api/send-notification/:user_id', async (req, res) => {
 });
 
 // === NUEVO ENDPOINT PARA ARCHIVAR Y LIMPIAR PEDIDOS ===
-app.post('/api/pedidos/archivar', (req, res) => {
+app.post('/api/pedidos/archivar', async (req, res) => {
   const actor = req.session && req.session.admin ? (req.session.admin.name || req.session.admin.email || 'admin') : 'admin';
-  const resultado = archivarYLimpiarPedidos(actor);
+  const archiveDate = normalizeArchiveDate(req.body && req.body.date ? req.body.date : null);
+  const pool = app.locals.db;
+
+  if (pool) {
+    try {
+      const result = await archiveOrdersInDb(pool, actor, archiveDate);
+      if (!result.archived) return res.json({ status: 'ok', mensaje: 'No hay pedidos activos para archivar.' });
+      return res.json({ status: 'ok', mensaje: `Archivados ${result.archived} pedidos.`, archive_date: result.archive_date, archived_at: result.archived_at, summary: result.summary });
+    } catch (e) {
+      console.error('/api/pedidos/archivar error (db):', e.message || e);
+      return res.status(500).json({ error: 'Error archivando pedidos en DB', detail: e.message });
+    }
+  }
+
+  const resultado = archivarYLimpiarPedidos(actor, archiveDate);
   if (resultado.archivar) {
     return res.json({
       status: 'ok',
       mensaje: `Archivados ${resultado.count} pedidos. Lista principal limpiada.`,
       archivo: path.basename(resultado.archivo),
+      archive_date: resultado.payload.archive_date,
       archived_by: resultado.payload && resultado.payload.archived_by ? resultado.payload.archived_by : null,
-      archived_at: resultado.payload && resultado.payload.archived_at ? resultado.payload.archived_at : null
+      archived_at: resultado.payload && resultado.payload.archived_at ? resultado.payload.archived_at : null,
+      summary: resultado.payload.summary || null
     });
   }
   res.json({ status: 'ok', mensaje: 'No había pedidos para archivar. Lista vacía.' });
