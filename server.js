@@ -17,11 +17,9 @@ try {
   }
 } catch (e) {
   console.warn('No se pudo inicializar Stripe:', e.message);
-          const archiveKey = obj.archive_key || f.replace(/\.json$/, '');
-          const archiveDate = obj.archive_date || deriveArchiveDateFromKey(archiveKey);
   stripe = null;
-            archive_key: archiveKey,
-            date: archiveDate,
+}
+
 let nodemailer = null;
 try {
   nodemailer = require('nodemailer');
@@ -29,7 +27,6 @@ try {
   console.warn('nodemailer no está instalado — las funciones de email estarán deshabilitadas.');
   nodemailer = null;
 }
-          return { archive_key: f.replace(/\.json$/, ''), date: deriveArchiveDateFromKey(f.replace(/\.json$/, '')), count: 0, archived_by: null, file: f };
 // Web Push (optional) - try to require web-push if installed
 let webpush = null;
 try {
@@ -38,7 +35,6 @@ try {
   console.warn('web-push no está instalado — Web Push estará deshabilitado. Para habilitar, npm install web-push');
   webpush = null;
 }
-    const q = `SELECT archive_key, archive_date::text AS date, archived_at, archived_by, jsonb_array_length(orders)::int AS count, summary
 let bcrypt = null;
 try {
   bcrypt = require('bcrypt');
