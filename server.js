@@ -79,29 +79,8 @@ if (pgPool) {
         summary jsonb
       )`);
       console.log('[INIT] Tabla order_archives verificada.');
-
-      await pgPool.query(`CREATE TABLE IF NOT EXISTS feedback (
-        id serial PRIMARY KEY,
-        name text NOT NULL,
-        email text,
-        category text,
-        message text NOT NULL,
-        created_at timestamptz NOT NULL DEFAULT NOW(),
-        metadata jsonb
-      )`);
-      console.log('[INIT] Tabla feedback verificada.');
-
-      await pgPool.query(`CREATE TABLE IF NOT EXISTS reviews (
-        id serial PRIMARY KEY,
-        name text NOT NULL,
-        rating integer NOT NULL CHECK (rating BETWEEN 1 AND 5),
-        comment text,
-        created_at timestamptz NOT NULL DEFAULT NOW(),
-        metadata jsonb
-      )`);
-      console.log('[INIT] Tabla reviews verificada.');
     } catch (e) {
-      console.error('[INIT] Error preparando tablas iniciales:', e.message || e);
+      console.error('[INIT] No se pudo verificar/crear order_archives:', e.message || e);
     }
   })();
 } else {
@@ -238,14 +217,10 @@ const DATA_DIR = chooseDataDir();
 const PEDIDOS_FILE = path.join(DATA_DIR, 'pedidos.json');
 // Nuevo directorio para archivos de pedidos diarios
 const ARCHIVE_DIR = path.join(DATA_DIR, 'pedidos_archivados');
-const FEEDBACK_FILE = path.join(DATA_DIR, 'feedback.json');
-const REVIEWS_FILE = path.join(DATA_DIR, 'reviews.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(ARCHIVE_DIR)) fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
 if (!fs.existsSync(PEDIDOS_FILE)) fs.writeFileSync(PEDIDOS_FILE, JSON.stringify([]));
-if (!fs.existsSync(FEEDBACK_FILE)) fs.writeFileSync(FEEDBACK_FILE, JSON.stringify([]));
-if (!fs.existsSync(REVIEWS_FILE)) fs.writeFileSync(REVIEWS_FILE, JSON.stringify([]));
 
 function leerPedidos() {
   try {
@@ -259,42 +234,6 @@ function leerPedidos() {
 
 function guardarPedidos(pedidos) {
   fs.writeFileSync(PEDIDOS_FILE, JSON.stringify(pedidos, null, 2));
-}
-
-function leerFeedback() {
-  try {
-    const raw = fs.readFileSync(FEEDBACK_FILE, 'utf8');
-    const parsed = JSON.parse(raw || '[]');
-    if (Array.isArray(parsed)) return parsed;
-    return [];
-  } catch (e) {
-    console.error('Error leyendo feedback:', e);
-    return [];
-  }
-}
-
-function guardarFeedback(entries) {
-  fs.writeFileSync(FEEDBACK_FILE, JSON.stringify(entries, null, 2));
-}
-
-function leerReviews(limit = 50) {
-  try {
-    const raw = fs.readFileSync(REVIEWS_FILE, 'utf8');
-    const parsed = JSON.parse(raw || '[]');
-    if (!Array.isArray(parsed)) return [];
-    const sorted = parsed
-      .slice()
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    if (limit && Number.isFinite(limit)) return sorted.slice(0, limit);
-    return sorted;
-  } catch (e) {
-    console.error('Error leyendo reviews:', e);
-    return [];
-  }
-}
-
-function guardarReviews(entries) {
-  fs.writeFileSync(REVIEWS_FILE, JSON.stringify(entries, null, 2));
 }
 
 const ARCHIVE_TIMEZONE = process.env.ARCHIVE_TZ || 'America/Santiago';
@@ -311,26 +250,72 @@ function normalizeArchiveDate(inputDate) {
   return archiveDateFormatter.format(baseDate);
 }
 
+// ------------------------------------------------------------------
+// NUEVA FUNCIÓN: Archivar pedidos del día y limpiar la lista principal
+// ------------------------------------------------------------------
+function asNumber(value, fallback = 0) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function normalizeItemList(rawItems) {
+  if (!rawItems) return [];
+  let items = rawItems;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); }
+    catch (e) { return []; }
+  }
+  if (!Array.isArray(items)) return [];
+  return items.map(it => {
+    if (!it || typeof it !== 'object') return { cantidad: 1, nombre: String(it), precio: 0 };
+    const cantidad = asNumber(it.cantidad ?? it.qty ?? it.quantity ?? 1, 1);
+    const nombre = it.nombre || it.name || it.product_name || it.product_code || 'Producto';
+    const precio = asNumber(it.precio ?? it.price ?? it.valor ?? 0, 0);
+    return { cantidad, nombre, precio };
+  });
+}
+
+function deriveFinancialFields(orderLike = {}) {
+  const items = normalizeItemList(orderLike.items || []);
+  const metadata = orderLike.metadata && typeof orderLike.metadata === 'object' ? orderLike.metadata : {};
+  const subtotal = items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
+  const explicitSubtotal = asNumber(metadata.subtotal, subtotal);
+  const taxAmount = asNumber(metadata.tax_amount ?? metadata.tax ?? metadata.iva ?? metadata.impuestos, 0);
+  const discountAmount = asNumber(metadata.discount_amount ?? metadata.descuento ?? metadata.discount, 0);
+  const explicitTotal = asNumber(orderLike.total ?? metadata.total ?? metadata.monto ?? subtotal + taxAmount - discountAmount, subtotal + taxAmount - discountAmount);
+  const paymentMethod = metadata.metodoPago || metadata.payment_method || orderLike.metodoPago || orderLike.payment_method || null;
+  const profitFromMeta = asNumber(metadata.profit ?? metadata.utilidad ?? metadata.margin, 0);
+  const costOfGoods = asNumber(metadata.cost_of_goods ?? metadata.costo, null);
+  const computedProfit = profitFromMeta || (Number.isFinite(costOfGoods) ? explicitTotal - costOfGoods : 0);
+  const itemsCount = items.reduce((sum, item) => sum + item.cantidad, 0);
+  return {
+    items,
+    subtotal: Number(explicitSubtotal.toFixed(2)),
+    tax_amount: Number(taxAmount.toFixed(2)),
+    discount_amount: Number(discountAmount.toFixed(2)),
+    total: Number(explicitTotal.toFixed(2)),
+    payment_method: paymentMethod,
+    profit: Number(computedProfit.toFixed(2)),
+    items_count: itemsCount,
+    metadata
+  };
+}
+
 function snapshotOrderData(orderRow = {}) {
   const metadata = orderRow.metadata && typeof orderRow.metadata === 'object'
     ? orderRow.metadata
     : {};
 
-  let items = orderRow.items;
-  if (typeof items === 'string') {
-    try { items = JSON.parse(items); } catch (e) { items = []; }
-  }
-  if (!Array.isArray(items)) items = [];
-
-  return {
+  const base = {
     id: orderRow.id || orderRow.original_order_id || null,
     external_id: orderRow.external_id || metadata.sessionId || null,
     cliente: orderRow.customer_name || orderRow.cliente || metadata.cliente || metadata.customer_name || null,
     email: orderRow.email || metadata.email || null,
-    items,
-    total: Number(orderRow.total || orderRow.monto || 0),
+    items: orderRow.items,
+    total: Number(orderRow.total || orderRow.monto || metadata.total || 0),
     estado: orderRow.status || orderRow.estado || metadata.estado || 'pendiente',
     metodoPago: metadata.metodoPago || orderRow.metodoPago || null,
+    payment_method: metadata.payment_method || metadata.metodoPago || orderRow.metodoPago || null,
     nota: metadata.nota || orderRow.nota || null,
     source: metadata.source || orderRow.source || null,
     paymentIntentId: metadata.paymentIntentId || orderRow.paymentIntentId || null,
@@ -338,12 +323,20 @@ function snapshotOrderData(orderRow = {}) {
     updated_at: orderRow.updated_at || null,
     metadata
   };
+
+  const financials = deriveFinancialFields(base);
+  return Object.assign({}, base, financials);
 }
 
 function summarizeOrders(orders = []) {
   const summary = {
     totalOrders: orders.length,
     totalAmount: 0,
+    subtotal: 0,
+    taxAmount: 0,
+    discountAmount: 0,
+    profit: 0,
+    itemsSold: 0,
     byStatus: {},
     byPaymentMethod: {},
     bySource: {},
@@ -352,19 +345,29 @@ function summarizeOrders(orders = []) {
   const productTotals = new Map();
 
   orders.forEach(order => {
-    const total = Number(order.total || 0);
+    const total = asNumber(order.total, 0);
+    const subtotal = asNumber(order.subtotal, total);
+    const tax = asNumber(order.tax_amount, 0);
+    const discount = asNumber(order.discount_amount, 0);
+    const profit = asNumber(order.profit, 0);
+    const itemsCount = asNumber(order.items_count, (order.items || []).reduce((sum, item) => sum + asNumber(item.cantidad || item.qty || 1, 1), 0));
     summary.totalAmount += total;
+    summary.subtotal += subtotal;
+    summary.taxAmount += tax;
+    summary.discountAmount += discount;
+    summary.profit += profit;
+    summary.itemsSold += itemsCount;
     const status = (order.estado || 'desconocido').toLowerCase();
     summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
-    const metodo = (order.metodoPago || 'desconocido').toLowerCase();
+    const metodo = (order.metodoPago || order.payment_method || 'desconocido').toLowerCase();
     summary.byPaymentMethod[metodo] = (summary.byPaymentMethod[metodo] || 0) + 1;
     const source = (order.source || 'desconocido').toLowerCase();
     summary.bySource[source] = (summary.bySource[source] || 0) + 1;
 
     (order.items || []).forEach(item => {
       const key = (item.nombre || item.name || item.product_code || 'sin_nombre').toLowerCase();
-      const qty = Number(item.cantidad || item.qty || 1);
-      const amount = Number(item.precio || item.price || 0) * qty;
+      const qty = asNumber(item.cantidad || item.qty || 1, 1);
+      const amount = asNumber(item.precio || item.price || 0, 0) * qty;
       const existing = productTotals.get(key) || { nombre: key, cantidad: 0, total: 0 };
       existing.cantidad += qty;
       existing.total += amount;
@@ -378,12 +381,81 @@ function summarizeOrders(orders = []) {
     .slice(0, 10);
 
   summary.totalAmount = Number(summary.totalAmount.toFixed(2));
+  summary.subtotal = Number(summary.subtotal.toFixed(2));
+  summary.taxAmount = Number(summary.taxAmount.toFixed(2));
+  summary.discountAmount = Number(summary.discountAmount.toFixed(2));
+  summary.profit = Number(summary.profit.toFixed(2));
+  summary.itemsSold = Number(summary.itemsSold.toFixed(2));
   return summary;
 }
 
-// ------------------------------------------------------------------
-// NUEVA FUNCIÓN: Archivar pedidos del día y limpiar la lista principal
-// ------------------------------------------------------------------
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfDay(date) {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function parseRangeDays(input) {
+  if (!input) return 30;
+  if (/^\d+$/.test(input)) return Math.max(1, Math.min(365, Number(input)));
+  const match = String(input).match(/^(\d+)([dDwWmMyY])$/);
+  if (!match) return 30;
+  const value = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  if (unit === 'w') return value * 7;
+  if (unit === 'm') return value * 30;
+  if (unit === 'y') return value * 365;
+  return value;
+}
+
+function resolveDateRange(query = {}) {
+  const now = new Date();
+  const toDate = query.to ? new Date(query.to) : now;
+  let fromDate;
+  if (query.from) {
+    fromDate = new Date(query.from);
+  } else {
+    const days = parseRangeDays(query.range || query.days || query.period || '30');
+    fromDate = new Date(toDate);
+    fromDate.setDate(fromDate.getDate() - (days - 1));
+  }
+  if (isNaN(fromDate) || isNaN(toDate)) {
+    throw new Error('Rango inválido. Usa fechas ISO (YYYY-MM-DD) o range=30d');
+  }
+  return { from: startOfDay(fromDate), to: endOfDay(toDate) };
+}
+
+function readArchivedOrdersFromFiles() {
+  if (!fs.existsSync(ARCHIVE_DIR)) return [];
+  const files = fs.readdirSync(ARCHIVE_DIR).filter(f => f.endsWith('.json'));
+  const collected = [];
+  for (const filename of files) {
+    try {
+      const raw = fs.readFileSync(path.join(ARCHIVE_DIR, filename));
+      const obj = JSON.parse(raw);
+      const archiveDate = obj.archive_date || filename.replace(/\.json$/, '');
+      const archivedAt = obj.archived_at || null;
+      const orders = Array.isArray(obj.orders) ? obj.orders : [];
+      orders.forEach(order => {
+        const enriched = Object.assign({}, order, {
+          archived_at: order.archived_at || archivedAt,
+          metadata: Object.assign({}, order.metadata || {}, { archive_date: archiveDate })
+        });
+        collected.push(snapshotOrderData(enriched));
+      });
+    } catch (e) {
+      console.warn('[ARCHIVE] No se pudo leer archivo', filename, e.message || e);
+    }
+  }
+  return collected;
+}
+
 function archivarYLimpiarPedidos(archived_by = 'system', archiveDateInput = null) {
   const pedidosActuales = leerPedidos();
   if (pedidosActuales.length === 0) {
@@ -423,8 +495,18 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
     const archivedAt = new Date().toISOString();
     const ordersSnapshot = r.rows.map(row => snapshotOrderData(row));
     const summary = summarizeOrders(ordersSnapshot);
-    const insertSql = `INSERT INTO archived_orders (original_order_id, items, total, archived_at, metadata)
-      VALUES ($1, $2::jsonb, $3, $4, $5::jsonb)`;
+    const insertSql = `INSERT INTO archived_orders (
+        original_order_id,
+        items,
+        subtotal,
+        tax_amount,
+        discount_amount,
+        total,
+        profit,
+        payment_method,
+        metadata,
+        archived_at
+      ) VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)`;
 
     for (const snap of ordersSnapshot) {
       const metadataObj = Object.assign({}, snap.metadata || {}, {
@@ -433,7 +515,18 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
         archive_date: archiveDate,
         order_snapshot: snap
       });
-      const params = [null, JSON.stringify(snap.items || []), snap.total || 0, archivedAt, JSON.stringify(metadataObj)];
+      const params = [
+        null,
+        JSON.stringify(snap.items || []),
+        snap.subtotal || 0,
+        snap.tax_amount || 0,
+        snap.discount_amount || 0,
+        snap.total || 0,
+        snap.profit || 0,
+        snap.payment_method || null,
+        JSON.stringify(metadataObj),
+        archivedAt
+      ];
       await client.query(insertSql, params);
     }
 
@@ -609,229 +702,6 @@ app.get('/api/dbtest', async (req, res) => {
   }
 });
 
-app.post('/api/feedback', async (req, res) => {
-  try {
-    const body = req.body || {};
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const email = typeof body.email === 'string' ? body.email.trim() : '';
-    const category = typeof body.category === 'string' ? body.category.trim() : '';
-    const message = typeof body.message === 'string' ? body.message.trim() : '';
-    const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
-
-    if (!name || !message) {
-      return res.status(400).json({ error: 'Nombre y mensaje son obligatorios.' });
-    }
-
-    if (message.length > 2000) {
-      return res.status(400).json({ error: 'El mensaje es demasiado largo.' });
-    }
-
-    const pool = app.locals.db;
-    const payload = {
-      name: name.slice(0, 200),
-      email: email.slice(0, 200) || null,
-      category: category.slice(0, 100) || null,
-      message,
-      metadata: Object.assign({}, metadata, {
-        source: metadata.source || 'web',
-        userAgent: req.headers['user-agent'] || null,
-        ip: req.headers['x-forwarded-for'] || (req.socket ? req.socket.remoteAddress : null) || null
-      })
-    };
-
-    if (pool) {
-      try {
-        const sql = `INSERT INTO feedback (name, email, category, message, metadata) VALUES ($1,$2,$3,$4,$5::jsonb)
-          RETURNING id, name, email, category, message, created_at`;
-        const params = [payload.name, payload.email, payload.category, payload.message, JSON.stringify(payload.metadata)];
-        const r = await pool.query(sql, params);
-        const row = r.rows[0];
-        return res.json({ status: 'ok', feedback: row });
-      } catch (err) {
-        console.error('[API] Error guardando feedback en DB:', err && err.message ? err.message : err);
-        return res.status(500).json({ error: 'Error guardando feedback en DB' });
-      }
-    }
-
-    const entries = leerFeedback();
-    const newEntry = {
-      id: Date.now(),
-      name: payload.name,
-      email: payload.email,
-      category: payload.category,
-      message: payload.message,
-      created_at: new Date().toISOString(),
-      metadata: payload.metadata
-    };
-    entries.push(newEntry);
-    guardarFeedback(entries);
-    return res.json({ status: 'ok', feedback: newEntry });
-  } catch (err) {
-    console.error('[API] Error inesperado en POST /api/feedback', err && err.message ? err.message : err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.get('/api/admin/feedback', async (req, res) => {
-  try {
-    const pool = app.locals.db;
-    if (pool) {
-      try {
-        const sql = `SELECT id, name, email, category, message, created_at FROM feedback ORDER BY created_at DESC LIMIT 500`;
-        const r = await pool.query(sql);
-        return res.json({ status: 'ok', feedback: r.rows });
-      } catch (err) {
-        console.error('[API] Error consultando feedback en DB:', err && err.message ? err.message : err);
-        return res.status(500).json({ error: 'Error consultando feedback en DB' });
-      }
-    }
-
-    const entries = leerFeedback()
-      .slice()
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    return res.json({ status: 'ok', feedback: entries.slice(0, 500) });
-  } catch (err) {
-    console.error('[API] Error inesperado en GET /api/admin/feedback', err && err.message ? err.message : err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.get('/api/reviews', async (req, res) => {
-  try {
-    const pool = app.locals.db;
-    if (pool) {
-      try {
-        const sql = `SELECT id, name, rating, comment, created_at FROM reviews ORDER BY created_at DESC LIMIT 50`;
-        const r = await pool.query(sql);
-        return res.json({ status: 'ok', reviews: r.rows });
-      } catch (err) {
-        console.error('[API] Error consultando reviews en DB:', err && err.message ? err.message : err);
-        return res.status(500).json({ error: 'Error consultando reviews en DB' });
-      }
-    }
-
-    const entries = leerReviews(50);
-    return res.json({ status: 'ok', reviews: entries });
-  } catch (err) {
-    console.error('[API] Error inesperado en GET /api/reviews', err && err.message ? err.message : err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.post('/api/reviews', async (req, res) => {
-  try {
-    const body = req.body || {};
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
-    const rating = Number(body.rating);
-    const metadata = typeof body.metadata === 'object' && body.metadata !== null ? body.metadata : {};
-
-    if (!name) {
-      return res.status(400).json({ error: 'El nombre es obligatorio.' });
-    }
-    if (!rating || !Number.isFinite(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'La valoración debe ser un número entre 1 y 5.' });
-    }
-    if (!comment) {
-      return res.status(400).json({ error: 'El comentario es obligatorio.' });
-    }
-    if (comment.length > 1200) {
-      return res.status(400).json({ error: 'El comentario es demasiado largo.' });
-    }
-
-    const payload = {
-      name: name.slice(0, 200),
-      comment,
-      rating: Math.round(rating),
-      metadata: Object.assign({}, metadata, {
-        source: metadata.source || 'web-review',
-        userAgent: req.headers['user-agent'] || null
-      })
-    };
-
-    const pool = app.locals.db;
-    if (pool) {
-      try {
-        const sql = `INSERT INTO reviews (name, rating, comment, metadata) VALUES ($1,$2,$3,$4::jsonb)
-          RETURNING id, name, rating, comment, created_at`;
-        const params = [payload.name, payload.rating, payload.comment, JSON.stringify(payload.metadata)];
-        const r = await pool.query(sql, params);
-        return res.json({ status: 'ok', review: r.rows[0] });
-      } catch (err) {
-        console.error('[API] Error guardando review en DB:', err && err.message ? err.message : err);
-        return res.status(500).json({ error: 'Error guardando review en DB' });
-      }
-    }
-
-    const entries = leerReviews();
-    const newEntry = {
-      id: Date.now(),
-      name: payload.name,
-      rating: payload.rating,
-      comment: payload.comment,
-      created_at: new Date().toISOString(),
-      metadata: payload.metadata
-    };
-    entries.unshift(newEntry);
-    guardarReviews(entries);
-    return res.json({ status: 'ok', review: newEntry });
-  } catch (err) {
-    console.error('[API] Error inesperado en POST /api/reviews', err && err.message ? err.message : err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.get('/api/admin/reviews', async (req, res) => {
-  try {
-    const pool = app.locals.db;
-    if (pool) {
-      try {
-        const sql = `SELECT id, name, rating, comment, created_at FROM reviews ORDER BY created_at DESC LIMIT 500`;
-        const r = await pool.query(sql);
-        return res.json({ status: 'ok', reviews: r.rows });
-      } catch (err) {
-        console.error('[API] Error consultando reviews en DB (admin):', err && err.message ? err.message : err);
-        return res.status(500).json({ error: 'Error consultando reviews en DB' });
-      }
-    }
-
-    const entries = leerReviews(500);
-    return res.json({ status: 'ok', reviews: entries });
-  } catch (err) {
-    console.error('[API] Error inesperado en GET /api/admin/reviews', err && err.message ? err.message : err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.delete('/api/admin/reviews/:id', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ error: 'ID inválido' });
-    const pool = app.locals.db;
-    if (pool) {
-      try {
-        const sql = 'DELETE FROM reviews WHERE id = $1 RETURNING id';
-        const r = await pool.query(sql, [id]);
-        if (!r.rows.length) return res.status(404).json({ error: 'Valoración no encontrada' });
-        return res.json({ status: 'ok', removed: id });
-      } catch (err) {
-        console.error('[API] Error eliminando review en DB:', err && err.message ? err.message : err);
-        return res.status(500).json({ error: 'Error eliminando review en DB' });
-      }
-    }
-
-    const entries = leerReviews();
-    const idx = entries.findIndex(entry => Number(entry.id) === id);
-    if (idx === -1) return res.status(404).json({ error: 'Valoración no encontrada' });
-    entries.splice(idx, 1);
-    guardarReviews(entries);
-    return res.json({ status: 'ok', removed: id });
-  } catch (err) {
-    console.error('[API] Error inesperado en DELETE /api/admin/reviews/:id', err && err.message ? err.message : err);
-    return res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
 
 // ------------------------------------------------------------------
 // Endpoints para archivar pedidos (admin)
@@ -989,6 +859,200 @@ app.delete('/api/admin/archives/:date', async (req, res) => {
     return res.status(500).json({ ok:false, error: e.message });
   } finally {
     client.release();
+  }
+});
+
+
+// ------------------------------------------------------------------
+// Estadísticas para el panel de administración
+// ------------------------------------------------------------------
+app.get('/api/admin/stats/overview', async (req, res) => {
+  let range;
+  try {
+    range = resolveDateRange(req.query || {});
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+  const pool = app.locals.db;
+  const fromISO = range.from.toISOString();
+  const toISO = range.to.toISOString();
+
+  if (!pool) {
+    const orders = readArchivedOrdersFromFiles();
+    const filtered = orders.filter(order => {
+      const when = new Date(order.archived_at || order.created_at || order.fecha || order.metadata?.archived_at || Date.now());
+      return when >= range.from && when <= range.to;
+    });
+    const summary = summarizeOrders(filtered);
+    const paymentMap = new Map();
+    const ordersByDayMap = new Map();
+    filtered.forEach(order => {
+      const method = (order.payment_method || order.metodoPago || 'desconocido').toLowerCase();
+      const current = paymentMap.get(method) || { payment_method: method, orders: 0, total: 0 };
+      current.orders += 1;
+      current.total += asNumber(order.total, 0);
+      paymentMap.set(method, current);
+      const dateKey = new Date(order.archived_at || order.created_at || order.fecha || Date.now()).toISOString().slice(0, 10);
+      const dayRow = ordersByDayMap.get(dateKey) || { date: dateKey, orders: 0, total: 0, items: 0 };
+      dayRow.orders += 1;
+      dayRow.total += asNumber(order.total, 0);
+      dayRow.items += asNumber(order.items_count, (order.items || []).length);
+      ordersByDayMap.set(dateKey, dayRow);
+    });
+    const overview = {
+      ordersCount: summary.totalOrders,
+      totalRevenue: summary.totalAmount,
+      subtotal: summary.subtotal,
+      taxAmount: summary.taxAmount,
+      discountAmount: summary.discountAmount,
+      profit: summary.profit,
+      itemsSold: summary.itemsSold
+    };
+    const paymentBreakdown = Array.from(paymentMap.values()).sort((a, b) => b.total - a.total);
+    const ordersByDay = Array.from(ordersByDayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return res.json({ ok: true, method: 'file', range: { from: fromISO, to: toISO }, overview, paymentBreakdown, ordersByDay });
+  }
+
+  try {
+    const overviewSql = `
+      SELECT
+        COALESCE(SUM(subtotal),0) AS subtotal,
+        COALESCE(SUM(tax_amount),0) AS tax_amount,
+        COALESCE(SUM(discount_amount),0) AS discount_amount,
+        COALESCE(SUM(total),0) AS total_revenue,
+        COALESCE(SUM(profit),0) AS profit,
+        COALESCE(SUM(items_count),0) AS items_sold,
+        COUNT(*)::int AS orders_count
+      FROM archived_orders
+      WHERE archived_at BETWEEN $1 AND $2
+    `;
+    const paymentSql = `
+      SELECT
+        COALESCE(NULLIF(payment_method, ''), 'desconocido') AS payment_method,
+        COUNT(*)::int AS orders,
+        COALESCE(SUM(total),0) AS total
+      FROM archived_orders
+      WHERE archived_at BETWEEN $1 AND $2
+      GROUP BY 1
+      ORDER BY total DESC
+    `;
+    const ordersByDaySql = `
+      SELECT
+        COALESCE(order_date, archived_at::date)::text AS date,
+        COUNT(*)::int AS orders,
+        COALESCE(SUM(total),0) AS total,
+        COALESCE(SUM(items_count),0) AS items
+      FROM archived_orders
+      WHERE archived_at BETWEEN $1 AND $2
+      GROUP BY 1
+      ORDER BY date
+    `;
+
+    const [overviewRes, paymentRes, dayRes] = await Promise.all([
+      pool.query(overviewSql, [fromISO, toISO]),
+      pool.query(paymentSql, [fromISO, toISO]),
+      pool.query(ordersByDaySql, [fromISO, toISO])
+    ]);
+
+    const overviewRow = overviewRes.rows[0] || {};
+    const overview = {
+      ordersCount: Number(overviewRow.orders_count || 0),
+      totalRevenue: Number(overviewRow.total_revenue || 0),
+      subtotal: Number(overviewRow.subtotal || 0),
+      taxAmount: Number(overviewRow.tax_amount || 0),
+      discountAmount: Number(overviewRow.discount_amount || 0),
+      profit: Number(overviewRow.profit || 0),
+      itemsSold: Number(overviewRow.items_sold || 0)
+    };
+
+    const paymentBreakdown = paymentRes.rows.map(row => ({
+      payment_method: row.payment_method || 'desconocido',
+      orders: Number(row.orders || 0),
+      total: Number(row.total || 0)
+    }));
+
+    const ordersByDay = dayRes.rows.map(row => ({
+      date: row.date,
+      orders: Number(row.orders || 0),
+      total: Number(row.total || 0),
+      items: Number(row.items || 0)
+    }));
+
+    return res.json({ ok: true, method: 'db', range: { from: fromISO, to: toISO }, overview, paymentBreakdown, ordersByDay });
+  } catch (e) {
+    console.error('Error obteniendo stats overview:', e.message || e);
+    return res.status(500).json({ ok: false, error: e.message || 'Error obteniendo estadísticas' });
+  }
+});
+
+app.get('/api/admin/stats/top-products', async (req, res) => {
+  let range;
+  try {
+    range = resolveDateRange(req.query || {});
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+  const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+  const fromISO = range.from.toISOString();
+  const toISO = range.to.toISOString();
+  const pool = app.locals.db;
+
+  if (!pool) {
+    const orders = readArchivedOrdersFromFiles().filter(order => {
+      const when = new Date(order.archived_at || order.created_at || order.fecha || Date.now());
+      return when >= range.from && when <= range.to;
+    });
+    const productMap = new Map();
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        const key = (item.nombre || item.name || 'Sin nombre').toLowerCase();
+        const current = productMap.get(key) || { nombre: item.nombre || item.name || 'Sin nombre', cantidad: 0, total: 0 };
+        const qty = asNumber(item.cantidad || item.qty || 1, 1);
+        const price = asNumber(item.precio || item.price || 0, 0);
+        current.cantidad += qty;
+        current.total += qty * price;
+        productMap.set(key, current);
+      });
+    });
+    const products = Array.from(productMap.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit)
+      .map(p => ({ nombre: p.nombre, cantidad: Number(p.cantidad.toFixed(2)), total: Number(p.total.toFixed(2)) }));
+    return res.json({ ok: true, method: 'file', range: { from: fromISO, to: toISO }, products });
+  }
+
+  const priceRegex = '^[-+]?[0-9]*\\.?[0-9]+$';
+  try {
+    const sql = `
+      SELECT
+        COALESCE(NULLIF(TRIM(item->>'nombre'), ''), 'Sin nombre') AS nombre,
+        SUM(
+          CASE WHEN (item->>'cantidad') ~ '${priceRegex}'
+            THEN (item->>'cantidad')::numeric
+            ELSE 1
+          END
+        )::float AS cantidad,
+        SUM(
+          (CASE WHEN (item->>'cantidad') ~ '${priceRegex}' THEN (item->>'cantidad')::numeric ELSE 1 END) *
+          (CASE WHEN (item->>'precio') ~ '${priceRegex}' THEN (item->>'precio')::numeric ELSE 0 END)
+        )::float AS total
+      FROM archived_orders ao,
+        LATERAL jsonb_array_elements(ao.items) AS item
+      WHERE ao.archived_at BETWEEN $1 AND $2
+      GROUP BY 1
+      ORDER BY total DESC
+      LIMIT $3
+    `;
+    const r = await pool.query(sql, [fromISO, toISO, limit]);
+    const products = r.rows.map(row => ({
+      nombre: row.nombre,
+      cantidad: Number(row.cantidad || 0),
+      total: Number(row.total || 0)
+    }));
+    return res.json({ ok: true, method: 'db', range: { from: fromISO, to: toISO }, products });
+  } catch (e) {
+    console.error('Error obteniendo top products:', e.message || e);
+    return res.status(500).json({ ok: false, error: e.message || 'Error obteniendo top products' });
   }
 });
 

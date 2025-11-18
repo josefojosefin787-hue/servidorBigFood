@@ -27,6 +27,16 @@
     .origin-web{ background:#e6f7ec;color:#0b8e4d }
     .origin-mobile{ background:#fff4e6;color:#d97706 }
     .origin-unknown{ background:#f0f0f0;color:#666 }
+    .stats-section{ margin:16px 0 24px }
+    .stats-grid{ display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px }
+    .stat-card{ background:#f6fbf7;border:1px solid #e0f1e6;border-radius:12px;padding:12px }
+    .stat-label{ font-size:0.85rem;color:#26613a;text-transform:uppercase;letter-spacing:0.05em }
+    .stat-value{ font-size:1.4rem;font-weight:700;color:#0b7040;margin-top:6px }
+    .stats-flex{ display:flex;flex-wrap:wrap;gap:16px;margin-top:16px }
+    .stat-panel{ flex:1 1 280px;background:#fff;border:1px solid #e6e6e6;border-radius:12px;padding:14px }
+    .stat-panel h3{ margin:0 0 10px;color:#0b5e28 }
+    .stat-panel ul{ list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px }
+    .stat-panel li{ display:flex;justify-content:space-between;font-size:0.95rem;color:#2f2f2f }
     @media (max-width:900px){ .pedidos-card{ padding:18px } table.pedidos-table th, table.pedidos-table td{ padding:10px } }
   </style>
 </head>
@@ -53,6 +63,40 @@
               <button id="btnShowLive" class="btn" title="Volver a la lista actual (hoy)" style="padding:6px 10px;font-size:0.9rem;display:none">Lista actual - Hoy</button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Ingresos (30d)</div>
+          <div class="stat-value" id="statRevenue">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pedidos</div>
+          <div class="stat-value" id="statOrders">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Productos vendidos</div>
+          <div class="stat-value" id="statItems">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ticket promedio</div>
+          <div class="stat-value" id="statAvg">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Utilidad estimada</div>
+          <div class="stat-value" id="statProfit">-</div>
+        </div>
+      </div>
+      <div class="stats-flex">
+        <div class="stat-panel">
+          <h3>Top productos (30 días)</h3>
+          <ul id="topProductsList"><li>Cargando...</li></ul>
+        </div>
+        <div class="stat-panel">
+          <h3>Métodos de pago</h3>
+          <ul id="paymentBreakdown"><li>Cargando...</li></ul>
         </div>
       </div>
     </div>
@@ -91,6 +135,67 @@
     function formatCurrency(value) {
       try { return currencyFormatter.format(Number(value || 0)); }
       catch (e) { return '$' + Number(value || 0).toFixed(0); }
+    }
+
+    async function loadStats(range = '30d') {
+      try {
+        const qs = encodeURIComponent(range);
+        const [overviewRes, productsRes] = await Promise.all([
+          fetch(`/api/admin/stats/overview?range=${qs}`, { credentials: 'same-origin' }),
+          fetch(`/api/admin/stats/top-products?range=${qs}&limit=5`, { credentials: 'same-origin' })
+        ]);
+        if (overviewRes.ok) {
+          const data = await overviewRes.json();
+          const overview = data.overview || {};
+          document.getElementById('statRevenue').textContent = formatCurrency(overview.totalRevenue || 0);
+          document.getElementById('statOrders').textContent = overview.ordersCount || 0;
+          document.getElementById('statItems').textContent = overview.itemsSold || 0;
+          const avg = (overview.totalRevenue && overview.ordersCount) ? (overview.totalRevenue / Math.max(overview.ordersCount, 1)) : 0;
+          document.getElementById('statAvg').textContent = formatCurrency(avg || 0);
+          document.getElementById('statProfit').textContent = formatCurrency(overview.profit || 0);
+          renderPaymentBreakdown(data.paymentBreakdown || []);
+        } else {
+          renderPaymentBreakdown([]);
+        }
+        if (productsRes.ok) {
+          const data = await productsRes.json();
+          renderTopProducts(data.products || []);
+        } else {
+          renderTopProducts([]);
+        }
+      } catch (e) {
+        console.warn('loadStats error', e);
+      }
+    }
+
+    function renderTopProducts(products) {
+      const list = document.getElementById('topProductsList');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!products.length) {
+        list.innerHTML = '<li>Sin datos</li>';
+        return;
+      }
+      products.forEach(prod => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${prod.nombre}</span><span>${Number(prod.cantidad || 0).toFixed(0)} · ${formatCurrency(prod.total || 0)}</span>`;
+        list.appendChild(li);
+      });
+    }
+
+    function renderPaymentBreakdown(breakdown) {
+      const list = document.getElementById('paymentBreakdown');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!breakdown.length) {
+        list.innerHTML = '<li>Sin datos</li>';
+        return;
+      }
+      breakdown.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${item.payment_method || 'desconocido'}</span><span>${item.orders || 0} · ${formatCurrency(item.total || 0)}</span>`;
+        list.appendChild(li);
+      });
     }
 
     async function ensureAdmin() {
@@ -299,7 +404,7 @@
     })();
 
     // initial load: fetch archives and live pedidos; refresh live every 5s only when not viewing archive
-    (async ()=>{ await ensureAdmin(); await fetchArchives(); await cargar(); setInterval(()=>{ if (!isViewingArchive) cargar(); }, 5000); })();
+    (async ()=>{ await ensureAdmin(); await fetchArchives(); await cargar(); await loadStats(); setInterval(()=>{ if (!isViewingArchive) cargar(); }, 5000); })();
 
   </script>
 </body>

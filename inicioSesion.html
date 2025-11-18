@@ -91,139 +91,6 @@
             color: #ffd700;
             margin: 15px 0;
         }
-
-        .reviews-actions {
-            margin-top: 40px;
-        }
-
-        .review-button {
-            background: #18944c;
-            color: #fff;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .review-button:hover {
-            background: #147a3e;
-        }
-
-        .modal-backdrop {
-            position: fixed;
-            inset: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.6);
-            padding: 20px;
-            z-index: 10000;
-        }
-
-        .modal-backdrop.is-visible {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--card-bg, #fff);
-            color: var(--text-primary, #1c1c1c);
-            border-radius: 16px;
-            padding: 30px;
-            max-width: 500px;
-            width: 100%;
-            position: relative;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.25);
-        }
-
-        .modal-close {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: transparent;
-            border: none;
-            color: inherit;
-            font-size: 1.4rem;
-            cursor: pointer;
-        }
-
-        .modal-content h3 {
-            margin-top: 0;
-            margin-bottom: 20px;
-        }
-
-        #reviewForm {
-            display: grid;
-            gap: 18px;
-        }
-
-        #reviewForm input,
-        #reviewForm textarea {
-            padding: 12px 15px;
-            border: 2px solid var(--input-border, #dcdcdc);
-            border-radius: 8px;
-            font-size: 1rem;
-            background: var(--bg-white, #fff);
-            color: inherit;
-        }
-
-        .rating-inputs {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .rating-star {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            font-size: 2rem;
-            color: #c4c4c4;
-            transition: transform 0.2s ease, color 0.2s ease;
-        }
-
-        .rating-star.is-active {
-            color: #ffd700;
-        }
-
-        .rating-star:focus-visible {
-            outline: 3px solid #18944c;
-            outline-offset: 2px;
-        }
-
-        .rating-star i {
-            pointer-events: none;
-        }
-
-        .review-submit {
-            background: #18944c;
-            color: #fff;
-            border: none;
-            padding: 14px 0;
-            border-radius: 8px;
-            font-size: 1.05rem;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-
-        .review-submit:hover {
-            background: #147a3e;
-        }
-
-        .review-status {
-            margin: 10px 0 0;
-            font-weight: 500;
-            min-height: 20px;
-        }
-
-        .review-status.success {
-            color: #18944c;
-        }
-
-        .review-status.error {
-            color: #b91c1c;
-        }
         
         .contact-section {
             max-width: 800px;
@@ -262,20 +129,6 @@
         
         .contact-form button:hover {
             background: #147a3e;
-        }
-
-        .contact-status {
-            margin-top: 10px;
-            min-height: 20px;
-            font-weight: 500;
-        }
-
-        .contact-status.success {
-            color: #18944c;
-        }
-
-        .contact-status.error {
-            color: #b91c1c;
         }
         
         .scroll-indicator {
@@ -411,9 +264,6 @@
                         <p>"El sistema de pagos es muy seguro y la atención al cliente es excelente. Definitivamente recomiendo BigFood."</p>
                     </div>
                 </div>
-                <div class="reviews-actions">
-                    <button type="button" class="review-button" id="openReviewModal">Dejar una reseña</button>
-                </div>
             </div>
         </section>
 
@@ -423,18 +273,16 @@
                 <h2 class="section-title">Contáctanos</h2>
                 <p>¿Tienes alguna pregunta o has encontrado algún problema? ¡Nos encantaría escucharte!</p>
                 <form class="contact-form" id="contactForm">
-                    <input type="text" id="contactName" name="name" placeholder="Nombre" maxlength="200" required>
-                    <input type="email" id="contactEmail" name="email" placeholder="Correo electrónico" maxlength="200" required>
-                    <select id="contactCategory" name="category" required>
-                        <option value="" disabled selected>Selecciona el tipo de consulta</option>
+                    <input type="text" placeholder="Nombre" required>
+                    <input type="email" placeholder="Correo electrónico" required>
+                    <select>
+                        <option value="">Selecciona el tipo de consulta</option>
                         <option value="consulta">Consulta general</option>
                         <option value="error">Reportar un error</option>
                         <option value="sugerencia">Sugerencia</option>
-                        <option value="queja">Queja</option>
                     </select>
-                    <textarea id="contactMessage" name="message" placeholder="Escribe tu mensaje aquí..." rows="5" maxlength="2000" required></textarea>
+                    <textarea placeholder="Escribe tu mensaje aquí..." rows="5" required></textarea>
                     <button type="submit">Enviar mensaje</button>
-                    <p class="contact-status" id="contactStatus" role="status" aria-live="polite"></p>
                 </form>
             </div>
         </section>
@@ -452,42 +300,6 @@
             <a href="#" target="_blank" class="menu-item">
                 <img src="/svg/youtube.svg" alt="Youtube">
             </a>
-        </div>
-    </div>
-
-    <div class="modal-backdrop" id="reviewModal" aria-hidden="true">
-        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
-            <button type="button" class="modal-close" id="closeReviewModal" aria-label="Cerrar formulario de reseña">
-                <i class="fas fa-times"></i>
-            </button>
-            <h3 id="reviewModalTitle">Deja tu reseña</h3>
-            <form id="reviewForm">
-                <label for="reviewName">Nombre</label>
-                <input type="text" id="reviewName" name="reviewName" placeholder="Ingresa tu nombre" required>
-                <span>Valoración</span>
-                <div class="rating-inputs" role="radiogroup" aria-label="Valoración con estrellas">
-                    <button type="button" class="rating-star" data-value="1" aria-pressed="false" aria-label="1 estrella">
-                        <i class="fas fa-star"></i>
-                    </button>
-                    <button type="button" class="rating-star" data-value="2" aria-pressed="false" aria-label="2 estrellas">
-                        <i class="fas fa-star"></i>
-                    </button>
-                    <button type="button" class="rating-star" data-value="3" aria-pressed="false" aria-label="3 estrellas">
-                        <i class="fas fa-star"></i>
-                    </button>
-                    <button type="button" class="rating-star" data-value="4" aria-pressed="false" aria-label="4 estrellas">
-                        <i class="fas fa-star"></i>
-                    </button>
-                    <button type="button" class="rating-star" data-value="5" aria-pressed="false" aria-label="5 estrellas">
-                        <i class="fas fa-star"></i>
-                    </button>
-                </div>
-                <input type="hidden" id="reviewRating" name="reviewRating">
-                <label for="reviewComment">Comentario</label>
-                <textarea id="reviewComment" name="reviewComment" rows="4" placeholder="Cuéntanos tu experiencia" required></textarea>
-                <p class="review-status" id="reviewStatus" role="status" aria-live="polite"></p>
-                <button type="submit" class="review-submit">Enviar reseña</button>
-            </form>
         </div>
     </div>
 
@@ -566,248 +378,6 @@
         });
     })();
 
-        </script>
-
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const contactForm = document.getElementById('contactForm');
-                const contactStatus = document.getElementById('contactStatus');
-                if (contactForm) {
-                    const submitButton = contactForm.querySelector('button[type="submit"]');
-                    contactForm.addEventListener('submit', async (event) => {
-                        if (event.defaultPrevented) {
-                            return;
-                        }
-                        event.preventDefault();
-                        if (contactStatus) {
-                            contactStatus.textContent = 'Enviando...';
-                            contactStatus.className = 'contact-status';
-                        }
-                        if (submitButton) submitButton.disabled = true;
-
-                        try {
-                            const formData = new FormData(contactForm);
-                            const payload = {
-                                name: String(formData.get('name') || '').trim(),
-                                email: String(formData.get('email') || '').trim(),
-                                category: String(formData.get('category') || '').trim(),
-                                message: String(formData.get('message') || '').trim(),
-                                metadata: { source: 'contact-form' }
-                            };
-
-                            const response = await fetch('/api/feedback', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(payload)
-                            });
-
-                            if (!response.ok) {
-                                const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }));
-                                throw new Error(errorData.error || 'No se pudo enviar tu mensaje');
-                            }
-
-                            contactForm.reset();
-                            if (contactStatus) {
-                                contactStatus.textContent = '¡Gracias! Hemos recibido tu mensaje.';
-                                contactStatus.className = 'contact-status success';
-                            }
-                        } catch (error) {
-                            console.error('Error enviando feedback:', error);
-                            if (contactStatus) {
-                                contactStatus.textContent = error.message || 'No pudimos enviar tu mensaje. Intenta nuevamente.';
-                                contactStatus.className = 'contact-status error';
-                            }
-                        } finally {
-                            if (submitButton) submitButton.disabled = false;
-                        }
-                    });
-                }
-
-                const reviewModal = document.getElementById('reviewModal');
-                const openModalBtn = document.getElementById('openReviewModal');
-                const closeModalBtn = document.getElementById('closeReviewModal');
-                const reviewForm = document.getElementById('reviewForm');
-                const ratingInput = document.getElementById('reviewRating');
-                const starButtons = Array.from(document.querySelectorAll('.rating-star'));
-                const reviewsGrid = document.querySelector('.reviews-grid');
-                const reviewStatus = document.getElementById('reviewStatus');
-                const reviewSubmitBtn = reviewForm ? reviewForm.querySelector('.review-submit') : null;
-                const renderedReviewIds = new Set();
-
-                const createReviewCard = (entry) => {
-                    const reviewCard = document.createElement('div');
-                    reviewCard.className = 'review-card';
-
-                    const nameHeading = document.createElement('h3');
-                    nameHeading.textContent = entry.name || entry.reviewName || 'Anónimo';
-                    reviewCard.appendChild(nameHeading);
-
-                    const starsRow = document.createElement('div');
-                    starsRow.className = 'stars';
-                    const ratingValue = Number(entry.rating || entry.reviewRating || 0);
-                    for (let i = 1; i <= 5; i += 1) {
-                        const starIcon = document.createElement('i');
-                        starIcon.className = i <= ratingValue ? 'fas fa-star' : 'far fa-star';
-                        starsRow.appendChild(starIcon);
-                    }
-                    reviewCard.appendChild(starsRow);
-
-                    const commentParagraph = document.createElement('p');
-                    const commentText = entry.comment || entry.reviewComment || '';
-                    commentParagraph.textContent = commentText ? `"${commentText}"` : '';
-                    reviewCard.appendChild(commentParagraph);
-
-                    return reviewCard;
-                };
-
-                const insertReviewCard = (entry, prepend = true) => {
-                    if (!reviewsGrid) return;
-                    if (entry && entry.id) {
-                        const key = String(entry.id);
-                        if (renderedReviewIds.has(key)) return;
-                        renderedReviewIds.add(key);
-                    }
-                    const card = createReviewCard(entry);
-                    if (prepend) reviewsGrid.prepend(card);
-                    else reviewsGrid.appendChild(card);
-                };
-
-                const loadStoredReviews = async () => {
-                    if (!reviewsGrid) return;
-                    try {
-                        const response = await fetch('/api/reviews');
-                        if (!response.ok) return;
-                        const data = await response.json().catch(() => null);
-                        if (!data || !Array.isArray(data.reviews)) return;
-                        for (let i = data.reviews.length - 1; i >= 0; i -= 1) {
-                            insertReviewCard(data.reviews[i], true);
-                        }
-                    } catch (error) {
-                        console.warn('No se pudieron cargar reseñas previas:', error);
-                    }
-                };
-
-                if (reviewModal && openModalBtn && closeModalBtn && reviewForm && ratingInput && reviewsGrid) {
-                    const updateStars = (value) => {
-                        starButtons.forEach((btn) => {
-                            const starValue = Number(btn.dataset.value);
-                            const isActive = starValue <= value;
-                            btn.classList.toggle('is-active', isActive);
-                            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-                        });
-                    };
-
-                    const openModal = () => {
-                        reviewModal.classList.add('is-visible');
-                        reviewModal.setAttribute('aria-hidden', 'false');
-                        document.body.style.overflow = 'hidden';
-                        setTimeout(() => {
-                            if (reviewForm.reviewName) {
-                                reviewForm.reviewName.focus();
-                            }
-                        }, 50);
-                    };
-
-                    const closeModal = () => {
-                        reviewModal.classList.remove('is-visible');
-                        reviewModal.setAttribute('aria-hidden', 'true');
-                        document.body.style.overflow = '';
-                        reviewForm.reset();
-                        ratingInput.value = '';
-                        updateStars(0);
-                        if (reviewStatus) {
-                            reviewStatus.textContent = '';
-                            reviewStatus.className = 'review-status';
-                        }
-                        if (reviewSubmitBtn) reviewSubmitBtn.disabled = false;
-                    };
-
-                    openModalBtn.addEventListener('click', openModal);
-                    closeModalBtn.addEventListener('click', closeModal);
-
-                    reviewModal.addEventListener('click', (event) => {
-                        if (event.target === reviewModal) {
-                            closeModal();
-                        }
-                    });
-
-                    document.addEventListener('keydown', (event) => {
-                        if (event.key === 'Escape' && reviewModal.classList.contains('is-visible')) {
-                            closeModal();
-                        }
-                    });
-
-                    starButtons.forEach((btn) => {
-                        btn.addEventListener('click', () => {
-                            const value = Number(btn.dataset.value);
-                            ratingInput.value = String(value);
-                            updateStars(value);
-                        });
-                    });
-
-                    reviewForm.addEventListener('submit', async (event) => {
-                        if (event.defaultPrevented) {
-                            return;
-                        }
-                        event.preventDefault();
-
-                        const nameValue = reviewForm.reviewName.value.trim();
-                        const commentValue = reviewForm.reviewComment.value.trim();
-                        const ratingValue = Number(ratingInput.value);
-
-                        if (!ratingValue) {
-                            if (starButtons[0]) {
-                                starButtons[0].focus();
-                            }
-                            return;
-                        }
-
-                        if (reviewStatus) {
-                            reviewStatus.textContent = 'Enviando tu reseña...';
-                            reviewStatus.className = 'review-status';
-                        }
-                        if (reviewSubmitBtn) reviewSubmitBtn.disabled = true;
-
-                        try {
-                            const payload = {
-                                name: nameValue,
-                                rating: ratingValue,
-                                comment: commentValue,
-                                metadata: { source: 'review-form' }
-                            };
-                            const response = await fetch('/api/reviews', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(payload)
-                            });
-                            if (!response.ok) {
-                                const errorData = await response.json().catch(() => ({ error: 'No se pudo enviar la reseña.' }));
-                                throw new Error(errorData.error || 'No se pudo enviar la reseña.');
-                            }
-                            const data = await response.json();
-                            if (data && data.review) {
-                                insertReviewCard(data.review, true);
-                            } else {
-                                insertReviewCard({ name: nameValue, rating: ratingValue, comment: commentValue }, true);
-                            }
-                            if (reviewStatus) {
-                                reviewStatus.textContent = '¡Gracias por tu reseña!';
-                                reviewStatus.className = 'review-status success';
-                            }
-                            setTimeout(() => { closeModal(); }, 400);
-                        } catch (error) {
-                            console.error('Error enviando reseña:', error);
-                            if (reviewStatus) {
-                                reviewStatus.textContent = error.message || 'No pudimos guardar tu reseña. Intenta nuevamente.';
-                                reviewStatus.className = 'review-status error';
-                            }
-                            if (reviewSubmitBtn) reviewSubmitBtn.disabled = false;
-                        }
-                    });
-
-                    loadStoredReviews();
-                }
-            });
         </script>
 
         <!-- Modal para palabra baneada -->
@@ -905,10 +475,8 @@
             document.addEventListener('DOMContentLoaded', function(){
                 const loginForm = document.querySelector('.cont-formulario');
                 const contactForm = document.getElementById('contactForm');
-                const reviewForm = document.getElementById('reviewForm');
                 bindFormValidation(loginForm);
                 bindFormValidation(contactForm);
-                bindFormValidation(reviewForm);
             });
         </script>
 
