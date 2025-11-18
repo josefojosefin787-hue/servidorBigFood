@@ -17,8 +17,11 @@ try {
   }
 } catch (e) {
   console.warn('No se pudo inicializar Stripe:', e.message);
+          const archiveKey = obj.archive_key || f.replace(/\.json$/, '');
+          const archiveDate = obj.archive_date || deriveArchiveDateFromKey(archiveKey);
   stripe = null;
-}
+            archive_key: archiveKey,
+            date: archiveDate,
 let nodemailer = null;
 try {
   nodemailer = require('nodemailer');
@@ -26,7 +29,7 @@ try {
   console.warn('nodemailer no está instalado — las funciones de email estarán deshabilitadas.');
   nodemailer = null;
 }
-
+          return { archive_key: f.replace(/\.json$/, ''), date: deriveArchiveDateFromKey(f.replace(/\.json$/, '')), count: 0, archived_by: null, file: f };
 // Web Push (optional) - try to require web-push if installed
 let webpush = null;
 try {
@@ -35,7 +38,7 @@ try {
   console.warn('web-push no está instalado — Web Push estará deshabilitado. Para habilitar, npm install web-push');
   webpush = null;
 }
-
+    const q = `SELECT archive_key, archive_date::text AS date, archived_at, archived_by, jsonb_array_length(orders)::int AS count, summary
 let bcrypt = null;
 try {
   bcrypt = require('bcrypt');
@@ -72,13 +75,26 @@ if (pgPool) {
   (async () => {
     try {
       await pgPool.query(`CREATE TABLE IF NOT EXISTS order_archives (
-        archive_date date PRIMARY KEY,
+        archive_key text PRIMARY KEY,
+        archive_date date NOT NULL,
         archived_at timestamptz NOT NULL,
         archived_by text,
         orders jsonb NOT NULL,
         summary jsonb
       )`);
-      console.log('[INIT] Tabla order_archives verificada.');
+      await pgPool.query(`ALTER TABLE order_archives ADD COLUMN IF NOT EXISTS archive_key text`);
+      await pgPool.query(`ALTER TABLE order_archives ADD COLUMN IF NOT EXISTS archive_date date`);
+      await pgPool.query(`UPDATE order_archives SET archive_key = COALESCE(archive_key, archive_date::text)`);
+      await pgPool.query(`ALTER TABLE order_archives ALTER COLUMN archive_key SET NOT NULL`);
+      await pgPool.query(`DO $$
+        BEGIN
+          ALTER TABLE order_archives DROP CONSTRAINT IF EXISTS order_archives_pkey;
+        EXCEPTION
+          WHEN undefined_object THEN NULL;
+        END $$;`);
+      await pgPool.query(`ALTER TABLE order_archives ADD CONSTRAINT order_archives_pkey PRIMARY KEY (archive_key)`);
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS order_archives_date_idx ON order_archives (archive_date DESC)`);
+      console.log('[INIT] Tabla order_archives verificada y normalizada.');
     } catch (e) {
       console.error('[INIT] No se pudo verificar/crear order_archives:', e.message || e);
     }
@@ -248,6 +264,34 @@ function normalizeArchiveDate(inputDate) {
   if (inputDate && /^\d{4}-\d{2}-\d{2}$/.test(String(inputDate))) return String(inputDate);
   const baseDate = inputDate ? new Date(inputDate) : new Date();
   return archiveDateFormatter.format(baseDate);
+}
+
+function generateArchiveKey(baseDateInput = null, reference = new Date()) {
+  const baseDate = normalizeArchiveDate(baseDateInput);
+  const safeStamp = reference.toISOString().replace(/[-:]/g, '').replace('T', '').replace('Z', '');
+  return `${baseDate}_${safeStamp}`;
+}
+
+function deriveArchiveDateFromKey(key) {
+  const match = String(key || '').match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : normalizeArchiveDate();
+}
+
+function resolveArchiveFile(identifier) {
+  if (!identifier) return null;
+  const direct = path.join(ARCHIVE_DIR, `${identifier}.json`);
+  if (fs.existsSync(direct)) return direct;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(identifier)) {
+    try {
+      const files = fs.readdirSync(ARCHIVE_DIR)
+        .filter(f => f.startsWith(identifier) && f.endsWith('.json'))
+        .sort();
+      if (files.length) return path.join(ARCHIVE_DIR, files[files.length - 1]);
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
 }
 
 // ------------------------------------------------------------------
@@ -439,13 +483,14 @@ function readArchivedOrdersFromFiles() {
     try {
       const raw = fs.readFileSync(path.join(ARCHIVE_DIR, filename));
       const obj = JSON.parse(raw);
-      const archiveDate = obj.archive_date || filename.replace(/\.json$/, '');
+      const archiveKey = obj.archive_key || filename.replace(/\.json$/, '');
+      const archiveDate = obj.archive_date || deriveArchiveDateFromKey(archiveKey);
       const archivedAt = obj.archived_at || null;
       const orders = Array.isArray(obj.orders) ? obj.orders : [];
       orders.forEach(order => {
         const enriched = Object.assign({}, order, {
           archived_at: order.archived_at || archivedAt,
-          metadata: Object.assign({}, order.metadata || {}, { archive_date: archiveDate })
+          metadata: Object.assign({}, order.metadata || {}, { archive_date: archiveDate, archive_key: archiveKey })
         });
         collected.push(snapshotOrderData(enriched));
       });
@@ -475,12 +520,15 @@ function archivarYLimpiarPedidos(archived_by = 'system', archiveDateInput = null
   }
 
   const fecha = normalizeArchiveDate(archiveDateInput);
-  const archivoArchivado = path.join(ARCHIVE_DIR, `${fecha}.json`);
+  const now = new Date();
+  const archiveKey = generateArchiveKey(fecha, now);
+  const archivoArchivado = path.join(ARCHIVE_DIR, `${archiveKey}.json`);
   const ordersSnapshot = pedidosActuales.map(p => snapshotOrderData(p));
   const summary = summarizeOrders(ordersSnapshot);
   const payload = {
     archive_date: fecha,
-    archived_at: new Date().toISOString(),
+    archive_key: archiveKey,
+    archived_at: now.toISOString(),
     archived_by: archived_by || 'system',
     orders: ordersSnapshot,
     summary
@@ -503,7 +551,9 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
       return { archived: 0, archive_date: archiveDate, archived_at: null, summary: null };
     }
 
-    const archivedAt = new Date().toISOString();
+    const now = new Date();
+    const archivedAt = now.toISOString();
+    const archiveKey = generateArchiveKey(archiveDate, now);
     const ordersSnapshot = r.rows.map(row => snapshotOrderData(row));
     const summary = summarizeOrders(ordersSnapshot);
     const insertSql = `INSERT INTO archived_orders (
@@ -524,6 +574,7 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
         archived_by: actor,
         original_order_id: snap.id,
         archive_date: archiveDate,
+        archive_key: archiveKey,
         order_snapshot: snap
       });
       const params = [
@@ -541,16 +592,17 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
       await client.query(insertSql, params);
     }
 
-    const upsertArchiveList = `INSERT INTO order_archives (archive_date, archived_at, archived_by, orders, summary)
-      VALUES ($1, $2, $3, $4::jsonb, $5::jsonb)
-      ON CONFLICT (archive_date)
-      DO UPDATE SET archived_at = EXCLUDED.archived_at, archived_by = EXCLUDED.archived_by, orders = EXCLUDED.orders, summary = EXCLUDED.summary`;
-    await client.query(upsertArchiveList, [archiveDate, archivedAt, actor, JSON.stringify(ordersSnapshot), JSON.stringify(summary)]);
+    const upsertArchiveList = `INSERT INTO order_archives (archive_key, archive_date, archived_at, archived_by, orders, summary)
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
+      ON CONFLICT (archive_key)
+      DO UPDATE SET archive_date = EXCLUDED.archive_date, archived_at = EXCLUDED.archived_at, archived_by = EXCLUDED.archived_by,
+        orders = EXCLUDED.orders, summary = EXCLUDED.summary`;
+    await client.query(upsertArchiveList, [archiveKey, archiveDate, archivedAt, actor, JSON.stringify(ordersSnapshot), JSON.stringify(summary)]);
 
     await client.query('DELETE FROM orders');
     await client.query('COMMIT');
 
-    return { archived: ordersSnapshot.length, archive_date: archiveDate, archived_at: archivedAt, summary };
+    return { archived: ordersSnapshot.length, archive_date: archiveDate, archive_key: archiveKey, archived_at: archivedAt, summary };
   } catch (e) {
     await client.query('ROLLBACK').catch(()=>{});
     throw e;
@@ -825,7 +877,15 @@ app.get('/api/admin/archives', async (req, res) => {
       const fallbackQ = `SELECT to_char(archived_at::date, 'YYYY-MM-DD') AS date, count(*)::int AS count
         FROM archived_orders GROUP BY date ORDER BY date DESC`;
       const r = await pool.query(fallbackQ);
-      return res.json({ ok: true, method: 'db-fallback', archives: r.rows });
+      const fallbackArchives = r.rows.map(row => ({
+        archive_key: row.date,
+        date: row.date,
+        count: row.count,
+        archived_at: null,
+        archived_by: null,
+        summary: null
+      }));
+      return res.json({ ok: true, method: 'db-fallback', archives: fallbackArchives });
     } catch (err) {
       console.error('Error listando archives (fallback):', err.message || err);
       return res.status(500).json({ ok:false, error: err.message });
@@ -834,33 +894,49 @@ app.get('/api/admin/archives', async (req, res) => {
 });
 
 
-// GET /api/admin/archives/:date (YYYY-MM-DD)
-app.get('/api/admin/archives/:date', async (req, res) => {
+// GET /api/admin/archives/:id (acepta clave completa o fecha base)
+app.get('/api/admin/archives/:id', async (req, res) => {
   const pool = app.locals.db;
-  const date = String(req.params.date || '').trim();
-  if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) return res.status(400).json({ ok:false, error: 'Formato de fecha inválido, usar YYYY-MM-DD' });
+  const identifier = String(req.params.id || '').trim();
+  if (!identifier) return res.status(400).json({ ok:false, error: 'Identificador de archivo requerido' });
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(identifier);
 
   if (!pool) {
-    const filePath = path.join(ARCHIVE_DIR, `${date}.json`);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ ok:false, error: 'Archivo de archive no encontrado' });
+    const filePath = resolveArchiveFile(identifier);
+    if (!filePath) return res.status(404).json({ ok:false, error: 'Archivo de archive no encontrado' });
     try {
       const raw = fs.readFileSync(filePath);
       const obj = JSON.parse(raw);
       const orders = Array.isArray(obj.orders) ? obj.orders : [];
-      return res.json({ ok: true, method: 'file', date, archived_at: obj.archived_at || null, archived_by: obj.archived_by || null, summary: obj.summary || null, orders });
+      const archiveKey = obj.archive_key || identifier;
+      const archiveDate = obj.archive_date || deriveArchiveDateFromKey(archiveKey);
+      return res.json({ ok: true, method: 'file', archive_key: archiveKey, date: archiveDate, archived_at: obj.archived_at || null, archived_by: obj.archived_by || null, summary: obj.summary || null, orders });
     } catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
   }
 
   try {
-    const q = `SELECT archive_date::text AS date, archived_at, archived_by, orders, summary FROM order_archives WHERE archive_date = $1 LIMIT 1`;
-    const r = await pool.query(q, [date]);
-    if (r.rows && r.rows.length) {
-      const row = r.rows[0];
-      return res.json({ ok: true, method: 'db', date, archived_at: row.archived_at, archived_by: row.archived_by, summary: row.summary || null, orders: row.orders || [] });
+    const baseQuery = `SELECT archive_key, archive_date::text AS date, archived_at, archived_by, orders, summary FROM order_archives`;
+    let row = null;
+    const byKey = await pool.query(`${baseQuery} WHERE archive_key = $1 LIMIT 1`, [identifier]);
+    if (byKey.rows && byKey.rows.length) {
+      row = byKey.rows[0];
+    } else if (isDateOnly) {
+      const byDate = await pool.query(`${baseQuery} WHERE archive_date = $1 ORDER BY archived_at DESC LIMIT 1`, [identifier]);
+      if (byDate.rows && byDate.rows.length) row = byDate.rows[0];
+    }
+    if (row) {
+      return res.json({ ok: true, method: 'db', archive_key: row.archive_key, date: row.date, archived_at: row.archived_at, archived_by: row.archived_by, summary: row.summary || null, orders: row.orders || [] });
     }
     // fallback to archived_orders if order_archives entry missing
-    const fallbackQ = `SELECT original_order_id, items, total, archived_at, metadata FROM archived_orders WHERE DATE(archived_at) = $1 ORDER BY archived_at DESC`;
-    const fallbackRows = await pool.query(fallbackQ, [date]);
+    const fallbackParams = isDateOnly ? [identifier] : [identifier];
+    const fallbackQ = isDateOnly
+      ? `SELECT original_order_id, items, total, archived_at, metadata FROM archived_orders WHERE DATE(archived_at) = $1 ORDER BY archived_at DESC`
+      : `SELECT original_order_id, items, total, archived_at, metadata FROM archived_orders WHERE metadata->>'archive_key' = $1 ORDER BY archived_at DESC`;
+    const fallbackRows = await pool.query(fallbackQ, fallbackParams);
+    if (!fallbackRows.rows.length) {
+      return res.status(404).json({ ok:false, error: 'Archivo no encontrado' });
+    }
+    const archiveDate = isDateOnly ? identifier : deriveArchiveDateFromKey(identifier);
     const orders = fallbackRows.rows.map(row => {
       if (row.metadata && row.metadata.order_snapshot) return row.metadata.order_snapshot;
       return snapshotOrderData({
@@ -869,37 +945,51 @@ app.get('/api/admin/archives/:date', async (req, res) => {
         total: row.total,
         status: row.metadata && row.metadata.status,
         customer_name: row.metadata && row.metadata.customer_name,
-        metadata: row.metadata,
+        metadata: Object.assign({}, row.metadata, { archive_key: row.metadata?.archive_key || identifier, archive_date: archiveDate }),
         created_at: row.archived_at
       });
     });
-    return res.json({ ok: true, method: 'db-fallback', date, archived_at: date, archived_by: null, orders });
+    return res.json({ ok: true, method: 'db-fallback', archive_key: identifier, date: archiveDate, archived_at: orders[0]?.archived_at || null, archived_by: null, orders });
   } catch (e) { console.error('Error obteniendo archive date:', e.message || e); return res.status(500).json({ ok:false, error: e.message }); }
 });
 
 
-// DELETE /api/admin/archives/:date -> elimina archivo o filas archivadas para esa fecha
-app.delete('/api/admin/archives/:date', async (req, res) => {
+// DELETE /api/admin/archives/:id -> elimina archivo o filas archivadas para esa clave
+app.delete('/api/admin/archives/:id', async (req, res) => {
   const pool = app.locals.db;
-  const date = String(req.params.date || '').trim();
-  if (!date.match(/^\d{4}-\d{2}-\d{2}$/)) return res.status(400).json({ ok:false, error: 'Formato de fecha inválido, usar YYYY-MM-DD' });
+  const identifier = String(req.params.id || '').trim();
+  if (!identifier) return res.status(400).json({ ok:false, error: 'Identificador requerido' });
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(identifier);
 
   if (!pool) {
-    const filePath = path.join(ARCHIVE_DIR, `${date}.json`);
-    if (!fs.existsSync(filePath)) return res.status(404).json({ ok:false, error: 'Archivo de archive no encontrado' });
+    const filePath = resolveArchiveFile(identifier);
+    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ ok:false, error: 'Archivo de archive no encontrado' });
     try {
       fs.unlinkSync(filePath);
-      return res.json({ ok: true, method: 'file', date, message: 'Archivo archivado eliminado' });
+      return res.json({ ok: true, method: 'file', id: identifier, message: 'Archivo archivado eliminado' });
     } catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
   }
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const delArchiveList = await client.query('DELETE FROM order_archives WHERE archive_date = $1', [date]);
-    const delOrders = await client.query('DELETE FROM archived_orders WHERE DATE(archived_at) = $1', [date]);
+    let deletedKeys = [];
+    const delByKey = await client.query('DELETE FROM order_archives WHERE archive_key = $1 RETURNING archive_key, archive_date', [identifier]);
+    deletedKeys = delByKey.rows.map(row => row.archive_key);
+    if (!deletedKeys.length && isDateOnly) {
+      const delByDate = await client.query('DELETE FROM order_archives WHERE archive_date = $1 RETURNING archive_key', [identifier]);
+      deletedKeys = delByDate.rows.map(row => row.archive_key);
+    }
+    let delOrders;
+    if (deletedKeys.length) {
+      delOrders = await client.query('DELETE FROM archived_orders WHERE metadata->>archive_key = ANY($1)', [deletedKeys]);
+    } else if (isDateOnly) {
+      delOrders = await client.query('DELETE FROM archived_orders WHERE DATE(archived_at) = $1', [identifier]);
+    } else {
+      delOrders = { rowCount: 0 };
+    }
     await client.query('COMMIT');
-    return res.json({ ok: true, method: 'db', date, deleted_lists: delArchiveList.rowCount, deleted_orders: delOrders.rowCount });
+    return res.json({ ok: true, method: 'db', id: identifier, deleted_lists: deletedKeys.length, deleted_orders: delOrders.rowCount || 0 });
   } catch (e) {
     await client.query('ROLLBACK').catch(()=>{});
     console.error('Error eliminando archived_orders/order_archives:', e.message || e);
