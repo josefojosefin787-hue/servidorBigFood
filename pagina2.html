@@ -115,7 +115,7 @@
 
   <script>
     // Basic client implementation that uses the same API as the original app.
-    const API_PRODUCTS = '/api/products';
+    const API_PRODUCTS = '/api/products?onlyAvailable=true';
     let products = [];
     let cart = JSON.parse(localStorage.getItem('cart')||'[]');
 
@@ -129,14 +129,14 @@
     async function fetchProducts(){ try{ const r=await fetch(API_PRODUCTS); products = await r.json(); renderCategories(); renderProducts(); }catch(e){ console.error('fetchProducts',e); products=[]; renderProducts(); } }
 
     // Render categories
-    function renderCategories(){ const nav = document.getElementById('categoriesNav'); nav.innerHTML=''; const cats = Array.from(new Set(products.map(p=>p.categoria||'Otros'))); // include 'Todos' first
+    function renderCategories(){ const nav = document.getElementById('categoriesNav'); nav.innerHTML=''; const visible = products.filter(p=>p.disponible !== false); const cats = Array.from(new Set(visible.map(p=>p.categoria||'Otros'))); // include 'Todos' first
       const allBtn = createCatButton('Todos','/img/MartitaLogoPequeño.png',true); nav.appendChild(allBtn);
-      cats.forEach(c=>{ const img = (products.find(p=>p.categoria===c && p.img) || {}).img || '/img/MartitaLogoPequeño.png'; nav.appendChild(createCatButton(c,img,false)); });
+      cats.forEach(c=>{ const img = (visible.find(p=>p.categoria===c && p.img) || {}).img || '/img/MartitaLogoPequeño.png'; nav.appendChild(createCatButton(c,img,false)); });
     }
     function createCatButton(cat,img,active){ const btn = document.createElement('button'); btn.className='cat-btn'+(active? ' active':''); btn.innerHTML=`<img src='${img}' alt='${cat}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'"><small style='font-size:.85rem'>${cat}</small>`; btn.dataset.cat=cat; btn.addEventListener('click',()=>{ document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderProducts(cat); }); return btn; }
 
     // Render product grid
-    function renderProducts(filter){ const grid = document.getElementById('productsGrid'); grid.innerHTML=''; const list = (filter && filter!=='Todos') ? products.filter(p=>p.categoria===filter) : products; list.forEach(p=>{ const div=document.createElement('div'); div.className='product'; div.innerHTML = `
+    function renderProducts(filter){ const grid = document.getElementById('productsGrid'); grid.innerHTML=''; const base = products.filter(p=>p.disponible !== false); const list = (filter && filter!=='Todos') ? base.filter(p=>p.categoria===filter) : base; if(!list.length){ grid.innerHTML='<p style="color:#666">No hay productos disponibles en esta categoría.</p>'; return;} list.forEach(p=>{ const div=document.createElement('div'); div.className='product'; div.innerHTML = `
         <img src='${p.img||"/img/placeholder.svg"}' alt='${p.nombre||"Producto"}' onerror="this.onerror=null;this.src='/img/MartitaLogoPequeño.png'">
         <h4>${p.nombre||'Sin nombre'}</h4>
         <div class='price'>$${typeof p.precio!=='undefined'?Number(p.precio):'0'}</div>

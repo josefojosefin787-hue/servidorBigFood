@@ -37,6 +37,15 @@
     .stat-panel h3{ margin:0 0 10px;color:#0b5e28 }
     .stat-panel ul{ list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px }
     .stat-panel li{ display:flex;justify-content:space-between;font-size:0.95rem;color:#2f2f2f }
+    .chart-list li{ flex-direction:column;gap:4px }
+    .chart-row{ display:flex;justify-content:space-between;align-items:center;font-size:0.9rem;color:#2b4634 }
+    .chart-progress{ width:100%;height:6px;border-radius:999px;background:#eaf4ee;overflow:hidden }
+    .chart-progress span{ display:block;height:100%;background:linear-gradient(90deg,#0b8e4d,#63c586) }
+    .chart-small{ font-size:0.78rem;color:#6b6b6b }
+    .bar-chart{ display:flex;align-items:flex-end;gap:10px;min-height:150px }
+    .bar-chart .bar{ flex:1;display:flex;flex-direction:column;align-items:center;font-size:0.75rem;color:#4a4a4a }
+    .bar-chart .bar-fill{ width:18px;background:linear-gradient(180deg,#63c586,#0b8e4d);border-radius:6px 6px 0 0;margin-bottom:6px }
+    .chart-empty{ color:#6f6f6f;font-size:0.9rem }
     @media (max-width:900px){ .pedidos-card{ padding:18px } table.pedidos-table th, table.pedidos-table td{ padding:10px } }
   </style>
 </head>
@@ -96,7 +105,15 @@
         </div>
         <div class="stat-panel">
           <h3>Métodos de pago</h3>
-          <ul id="paymentBreakdown"><li>Cargando...</li></ul>
+          <ul id="paymentBreakdown" class="chart-list"><li>Cargando...</li></ul>
+        </div>
+        <div class="stat-panel">
+          <h3>Actividad por hora</h3>
+          <div id="hourlyChart" class="bar-chart"><div class="chart-empty">Cargando...</div></div>
+        </div>
+        <div class="stat-panel">
+          <h3>Categorías destacadas</h3>
+          <ul id="categoryBreakdown" class="chart-list"><li>Cargando...</li></ul>
         </div>
       </div>
     </div>
@@ -140,9 +157,11 @@
     async function loadStats(range = '30d') {
       try {
         const qs = encodeURIComponent(range);
-        const [overviewRes, productsRes] = await Promise.all([
+        const [overviewRes, productsRes, hourlyRes, categoryRes] = await Promise.all([
           fetch(`/api/admin/stats/overview?range=${qs}`, { credentials: 'same-origin' }),
-          fetch(`/api/admin/stats/top-products?range=${qs}&limit=5`, { credentials: 'same-origin' })
+          fetch(`/api/admin/stats/top-products?range=${qs}&limit=5`, { credentials: 'same-origin' }),
+          fetch(`/api/admin/stats/hourly-sales?range=${qs}`, { credentials: 'same-origin' }),
+          fetch(`/api/admin/stats/category-sales?range=${qs}&limit=6`, { credentials: 'same-origin' })
         ]);
         if (overviewRes.ok) {
           const data = await overviewRes.json();
@@ -162,6 +181,18 @@
           renderTopProducts(data.products || []);
         } else {
           renderTopProducts([]);
+        }
+        if (hourlyRes.ok) {
+          const data = await hourlyRes.json();
+          renderHourlyChart(data.buckets || []);
+        } else {
+          renderHourlyChart([]);
+        }
+        if (categoryRes.ok) {
+          const data = await categoryRes.json();
+          renderCategoryBreakdown(data.categories || []);
+        } else {
+          renderCategoryBreakdown([]);
         }
       } catch (e) {
         console.warn('loadStats error', e);
@@ -191,11 +222,77 @@
         list.innerHTML = '<li>Sin datos</li>';
         return;
       }
+      const total = breakdown.reduce((sum, item) => sum + (item.total || 0), 0) || 1;
       breakdown.forEach(item => {
+        const pct = Math.round(((item.total || 0) / total) * 100);
         const li = document.createElement('li');
-        li.innerHTML = `<span>${item.payment_method || 'desconocido'}</span><span>${item.orders || 0} · ${formatCurrency(item.total || 0)}</span>`;
+        li.innerHTML = `
+          <div class="chart-row">
+            <span>${item.payment_method || 'Desconocido'}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="chart-progress"><span style="width:${pct}%"></span></div>
+          <div class="chart-small">${item.orders || 0} pedidos · ${formatCurrency(item.total || 0)}</div>
+        `;
         list.appendChild(li);
       });
+    }
+
+    function renderHourlyChart(buckets) {
+      const container = document.getElementById('hourlyChart');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!buckets.length) {
+        container.innerHTML = '<div class="chart-empty">Sin datos</div>';
+        return;
+      }
+      const sample = buckets.slice(-12);
+      const maxTotal = Math.max(...sample.map(b => Number(b.total || 0)), 1);
+      const chartHeight = 120;
+      sample.forEach(bucket => {
+        const total = Number(bucket.total || 0);
+        const height = Math.max(8, Math.round((total / maxTotal) * chartHeight));
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.innerHTML = `<span class="bar-fill" style="height:${height}px"></span><small>${formatHourLabel(bucket.hour)}</small>`;
+        bar.title = `${formatCurrency(total)} · ${bucket.orders || 0} pedidos`;
+        container.appendChild(bar);
+      });
+    }
+
+    function renderCategoryBreakdown(categories) {
+      const list = document.getElementById('categoryBreakdown');
+      if (!list) return;
+      list.innerHTML = '';
+      if (!categories.length) {
+        list.innerHTML = '<li>Sin datos</li>';
+        return;
+      }
+      const total = categories.reduce((sum, cat) => sum + (cat.total || 0), 0) || 1;
+      categories.forEach(cat => {
+        const pct = Math.round(((cat.total || 0) / total) * 100);
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <div class="chart-row">
+            <span>${cat.categoria || 'Sin categoría'}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="chart-progress"><span style="width:${pct}%"></span></div>
+          <div class="chart-small">${Number(cat.unidades || 0).toFixed(0)} uds · ${formatCurrency(cat.total || 0)}</div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function formatHourLabel(value) {
+      if (!value) return '--';
+      try {
+        const d = new Date(value);
+        const h = String(d.getHours()).padStart(2, '0');
+        return `${h}h`;
+      } catch (e) {
+        return '--';
+      }
     }
 
     async function ensureAdmin() {

@@ -456,6 +456,17 @@ function readArchivedOrdersFromFiles() {
   return collected;
 }
 
+function getOrderTimestamp(order) {
+  const raw = order && (order.archived_at || order.created_at || order.fecha || (order.metadata && (order.metadata.archived_at || order.metadata.created_at)));
+  const date = raw ? new Date(raw) : new Date();
+  return isNaN(date) ? new Date() : date;
+}
+
+function detectItemCategory(item) {
+  if (!item || typeof item !== 'object') return 'Sin categoría';
+  return (item.categoria || item.category || item.cat || (item.metadata && (item.metadata.categoria || item.metadata.category)) || 'Sin categoría').trim() || 'Sin categoría';
+}
+
 function archivarYLimpiarPedidos(archived_by = 'system', archiveDateInput = null) {
   const pedidosActuales = leerPedidos();
   if (pedidosActuales.length === 0) {
@@ -619,9 +630,38 @@ function guardarProducts(data) {
 app.get('/api/products', (req, res) => {
   const pool = app.locals.db;
   const categoria = req.query.categoria;
+
+  const normalizeBool = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const v = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'si', 'on'].includes(v)) return true;
+      if (['false', '0', 'no', 'off'].includes(v)) return false;
+    }
+    return null;
+  };
+  const availabilityFilter = (() => {
+    const explicit = normalizeBool(req.query.available);
+    if (explicit !== null) return explicit;
+    const onlyAvailable = normalizeBool(req.query.onlyAvailable);
+    if (onlyAvailable === true) return true;
+    return null;
+  })();
+
   if (pool) {
-    const sql = categoria ? 'SELECT * FROM products WHERE category = $1 ORDER BY id' : 'SELECT * FROM products ORDER BY id';
-    const params = categoria ? [categoria] : [];
+    const conditions = [];
+    const params = [];
+    let idx = 1;
+    if (categoria) {
+      conditions.push(`category = $${idx++}`);
+      params.push(categoria);
+    }
+    if (availabilityFilter !== null) {
+      conditions.push(`available = $${idx++}`);
+      params.push(availabilityFilter);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sql = `SELECT * FROM products ${whereClause} ORDER BY id`;
     return pool.query(sql, params)
       .then(r => {
         const rows = r.rows.map(row => ({
@@ -646,10 +686,17 @@ app.get('/api/products', (req, res) => {
   try {
     console.log('[API] GET /api/products -> using local JSON PRODUCTS_FILE=', PRODUCTS_FILE, 'exists=', fs.existsSync(PRODUCTS_FILE));
     const data = leerProducts();
+    let list = data.products || [];
     if (categoria) {
-      return res.json(data.products.filter(p => p.categoria === categoria));
+      list = list.filter(p => p.categoria === categoria);
     }
-    return res.json(data.products);
+    if (availabilityFilter !== null) {
+      list = list.filter(p => {
+        const value = typeof p.disponible === 'undefined' ? true : !!p.disponible;
+        return value === availabilityFilter;
+      });
+    }
+    return res.json(list);
   } catch (e) {
     console.error('[API] Error leyendo products:', e);
     res.status(500).json({ error: 'Error leyendo products', detail: e.message });
@@ -1053,6 +1100,145 @@ app.get('/api/admin/stats/top-products', async (req, res) => {
   } catch (e) {
     console.error('Error obteniendo top products:', e.message || e);
     return res.status(500).json({ ok: false, error: e.message || 'Error obteniendo top products' });
+  }
+});
+
+app.get('/api/admin/stats/hourly-sales', async (req, res) => {
+  let range;
+  try {
+    range = resolveDateRange(req.query || {});
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+  const pool = app.locals.db;
+  const fromISO = range.from.toISOString();
+  const toISO = range.to.toISOString();
+
+  if (!pool) {
+    const orders = readArchivedOrdersFromFiles().filter(order => {
+      const when = getOrderTimestamp(order);
+      return when >= range.from && when <= range.to;
+    });
+    const bucketMap = new Map();
+    orders.forEach(order => {
+      const when = getOrderTimestamp(order);
+      when.setMinutes(0, 0, 0);
+      const key = when.toISOString();
+      const bucket = bucketMap.get(key) || { hour: key, orders: 0, total: 0, items: 0 };
+      bucket.orders += 1;
+      bucket.total += asNumber(order.total, 0);
+      bucket.items += asNumber(order.items_count, (order.items || []).length);
+      bucketMap.set(key, bucket);
+    });
+    const buckets = Array.from(bucketMap.values()).sort((a, b) => new Date(a.hour) - new Date(b.hour));
+    return res.json({ ok: true, method: 'file', range: { from: fromISO, to: toISO }, buckets });
+  }
+
+  try {
+    const sql = `
+      SELECT
+        date_trunc('hour', archived_at) AS bucket,
+        COUNT(*)::int AS orders,
+        COALESCE(SUM(total),0) AS total,
+        COALESCE(SUM(items_count),0) AS items
+      FROM archived_orders
+      WHERE archived_at BETWEEN $1 AND $2
+      GROUP BY 1
+      ORDER BY bucket
+    `;
+    const r = await pool.query(sql, [fromISO, toISO]);
+    const buckets = r.rows.map(row => ({
+      hour: row.bucket ? new Date(row.bucket).toISOString() : null,
+      orders: Number(row.orders || 0),
+      total: Number(row.total || 0),
+      items: Number(row.items || 0)
+    }));
+    return res.json({ ok: true, method: 'db', range: { from: fromISO, to: toISO }, buckets });
+  } catch (e) {
+    console.error('Error obteniendo hourly sales:', e.message || e);
+    return res.status(500).json({ ok: false, error: e.message || 'Error obteniendo ventas por hora' });
+  }
+});
+
+app.get('/api/admin/stats/category-sales', async (req, res) => {
+  let range;
+  try {
+    range = resolveDateRange(req.query || {});
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+  const pool = app.locals.db;
+  const fromISO = range.from.toISOString();
+  const toISO = range.to.toISOString();
+  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
+
+  if (!pool) {
+    const orders = readArchivedOrdersFromFiles().filter(order => {
+      const when = getOrderTimestamp(order);
+      return when >= range.from && when <= range.to;
+    });
+    const catMap = new Map();
+    orders.forEach(order => {
+      (order.items || []).forEach(item => {
+        const category = detectItemCategory(item);
+        const entry = catMap.get(category) || { categoria: category, unidades: 0, total: 0, pedidos: 0 };
+        const qty = asNumber(item.cantidad || item.qty || 1, 1);
+        const price = asNumber(item.precio || item.price || 0, 0);
+        entry.unidades += qty;
+        entry.total += qty * price;
+        entry.pedidos += 1;
+        catMap.set(category, entry);
+      });
+    });
+    const categories = Array.from(catMap.values())
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit)
+      .map(row => ({
+        categoria: row.categoria,
+        unidades: Number(row.unidades.toFixed(2)),
+        total: Number(row.total.toFixed(2)),
+        pedidos: row.pedidos
+      }));
+    return res.json({ ok: true, method: 'file', range: { from: fromISO, to: toISO }, categories });
+  }
+
+  const numberRegex = '^[-+]?[0-9]*\\.?[0-9]+$';
+  try {
+    const sql = `
+      WITH expanded AS (
+        SELECT
+          ao.id,
+          ao.archived_at,
+          COALESCE(NULLIF(TRIM(COALESCE(
+            item->>'categoria', item->>'category', item->>'cat'
+          )), ''), 'Sin categoría') AS categoria,
+          CASE WHEN (item->>'cantidad') ~ '${numberRegex}' THEN (item->>'cantidad')::numeric ELSE 1 END AS qty,
+          CASE WHEN (item->>'precio') ~ '${numberRegex}' THEN (item->>'precio')::numeric ELSE 0 END AS price
+        FROM archived_orders ao
+        CROSS JOIN LATERAL jsonb_array_elements(ao.items) AS item
+        WHERE ao.archived_at BETWEEN $1 AND $2
+      )
+      SELECT
+        categoria,
+        COUNT(DISTINCT id)::int AS pedidos,
+        SUM(qty)::float AS unidades,
+        SUM(qty * price)::float AS total
+      FROM expanded
+      GROUP BY categoria
+      ORDER BY total DESC
+      LIMIT $3
+    `;
+    const r = await pool.query(sql, [fromISO, toISO, limit]);
+    const categories = r.rows.map(row => ({
+      categoria: row.categoria,
+      pedidos: Number(row.pedidos || 0),
+      unidades: Number(row.unidades || 0),
+      total: Number(row.total || 0)
+    }));
+    return res.json({ ok: true, method: 'db', range: { from: fromISO, to: toISO }, categories });
+  } catch (e) {
+    console.error('Error obteniendo category sales:', e.message || e);
+    return res.status(500).json({ ok: false, error: e.message || 'Error obteniendo ventas por categoría' });
   }
 });
 
