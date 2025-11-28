@@ -276,7 +276,7 @@
       const raw = String(cat || '').trim();
       if (!raw) return '';
       const norm = raw.toLowerCase();
-      if (norm === 'comida rapida') return 'Comida rápida';
+      if (norm === 'comida rapida') return 'Comida rapida';
       return raw
         .split(' ')
         .map(w => w.charAt(0).toUpperCase() + w.slice(1))

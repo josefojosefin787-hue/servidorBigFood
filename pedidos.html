@@ -1,121 +1,316 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Pedidos - Admin</title>
   <link rel="stylesheet" href="/styles.css">
   <style>
-    :root{ --green:#0b8e4d; --accent:#34a853; --muted:#6b6b6b }
-    body.pedidos-page{ margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 12px;background:linear-gradient(140deg,#0b8e4d 0%,#34a853 55%,#0b5e28 100%); }
-    .pedidos-card{ width:100%;max-width:1100px;background:rgba(255,255,255,0.98);border-radius:18px;padding:22px;box-shadow:0 30px 60px rgba(6,62,30,0.22); }
-    .pedidos-card h1{ margin:0 0 12px;color:var(--green) }
-    .table-wrap{ overflow:auto }
-    table.pedidos-table{ width:100%;border-collapse:collapse;min-width:860px }
-    table.pedidos-table th, table.pedidos-table td{ padding:12px 10px;border-bottom:1px solid #eee;text-align:left;vertical-align:middle }
-    table.pedidos-table th{ background:linear-gradient(90deg,rgba(11,94,42,0.06),rgba(11,94,42,0.02));color:var(--green);font-weight:600 }
-    .actions { display:flex; gap:8px }
-    .btn{ background:var(--green); color:#fff; border:0; padding:8px 10px; border-radius:8px; cursor:pointer; font-weight:600 }
-    .btn.secondary{ background:#f0ad4e }
-    .btn.danger{ background:#d9534f }
-    .status-badge{ padding:6px 10px;border-radius:999px;font-weight:700;display:inline-block }
-    .status-pendiente{ background:#fff3cd;color:#856404 }
-    .status-preparacion{ background:#cfe2ff;color:#084298 }
-    .status-listo{ background:#d1e7dd;color:#0f5132 }
-    .small{ font-size:0.9rem; color:var(--muted) }
-    .origin-badge{ padding:6px 8px;border-radius:999px;font-weight:700;display:inline-block;font-size:0.85rem }
-    .origin-web{ background:#e6f7ec;color:#0b8e4d }
-    .origin-mobile{ background:#fff4e6;color:#d97706 }
-    .origin-unknown{ background:#f0f0f0;color:#666 }
-    .stats-section{ margin:16px 0 24px }
-    .stats-grid{ display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px }
-    .stat-card{ background:#f6fbf7;border:1px solid #e0f1e6;border-radius:12px;padding:12px }
-    .stat-label{ font-size:0.85rem;color:#26613a;text-transform:uppercase;letter-spacing:0.05em }
-    .stat-value{ font-size:1.4rem;font-weight:700;color:#0b7040;margin-top:6px }
-    .stats-flex{ display:flex;flex-wrap:wrap;gap:16px;margin-top:16px }
-    .stat-panel{ flex:1 1 280px;background:#fff;border:1px solid #e6e6e6;border-radius:12px;padding:14px }
-    .stat-panel h3{ margin:0 0 10px;color:#0b5e28 }
-    .stat-panel ul{ list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px }
-    .stat-panel li{ display:flex;justify-content:space-between;font-size:0.95rem;color:#2f2f2f }
-    .chart-list li{ flex-direction:column;gap:4px }
-    .chart-row{ display:flex;justify-content:space-between;align-items:center;font-size:0.9rem;color:#2b4634 }
-    .chart-progress{ width:100%;height:6px;border-radius:999px;background:#eaf4ee;overflow:hidden }
-    .chart-progress span{ display:block;height:100%;background:linear-gradient(90deg,#0b8e4d,#63c586) }
-    .chart-small{ font-size:0.78rem;color:#6b6b6b }
-    .bar-chart{ display:flex;align-items:flex-end;gap:10px;min-height:150px }
-    .bar-chart .bar{ flex:1;display:flex;flex-direction:column;align-items:center;font-size:0.75rem;color:#4a4a4a }
-    .bar-chart .bar-fill{ width:18px;background:linear-gradient(180deg,#63c586,#0b8e4d);border-radius:6px 6px 0 0;margin-bottom:6px }
-    .chart-empty{ color:#6f6f6f;font-size:0.9rem }
-    @media (max-width:900px){ .pedidos-card{ padding:18px } table.pedidos-table th, table.pedidos-table td{ padding:10px } }
+    :root {
+      --green: #0b8e4d;
+      --accent: #34a853;
+      --muted: #6b6b6b
+    }
+
+    body.pedidos-page {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 12px;
+      background: linear-gradient(140deg, #0b8e4d 0%, #34a853 55%, #0b5e28 100%);
+    }
+
+    .pedidos-card {
+      width: 100%;
+      max-width: 1100px;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 30px 60px rgba(6, 62, 30, 0.22);
+    }
+
+    .pedidos-card h1 {
+      margin: 0 0 12px;
+      color: var(--green)
+    }
+
+    .table-wrap {
+      overflow: auto
+    }
+
+    table.pedidos-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 860px
+    }
+
+    table.pedidos-table th,
+    table.pedidos-table td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+      vertical-align: middle
+    }
+
+    table.pedidos-table th {
+      background: linear-gradient(90deg, rgba(11, 94, 42, 0.06), rgba(11, 94, 42, 0.02));
+      color: var(--green);
+      font-weight: 600
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px
+    }
+
+    .btn {
+      background: var(--green);
+      color: #fff;
+      border: 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600
+    }
+
+    .btn.secondary {
+      background: #f0ad4e
+    }
+
+    .btn.danger {
+      background: #d9534f
+    }
+
+    .status-badge {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      display: inline-block
+    }
+
+    .status-pendiente {
+      background: #fff3cd;
+      color: #856404
+    }
+
+    .status-preparacion {
+      background: #cfe2ff;
+      color: #084298
+    }
+
+    .status-listo {
+      background: #d1e7dd;
+      color: #0f5132
+    }
+
+    .small {
+      font-size: 0.9rem;
+      color: var(--muted)
+    }
+
+    .origin-badge {
+      padding: 6px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+      display: inline-block;
+      font-size: 0.85rem
+    }
+
+    .origin-web {
+      background: #e6f7ec;
+      color: #0b8e4d
+    }
+
+    .origin-mobile {
+      background: #fff4e6;
+      color: #d97706
+    }
+
+    .origin-unknown {
+      background: #f0f0f0;
+      color: #666
+    }
+
+    .stats-section {
+      margin: 16px 0 24px
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px
+    }
+
+    .stat-card {
+      background: #f6fbf7;
+      border: 1px solid #e0f1e6;
+      border-radius: 12px;
+      padding: 12px
+    }
+
+    .stat-label {
+      font-size: 0.85rem;
+      color: #26613a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #0b7040;
+      margin-top: 6px
+    }
+
+    .stats-flex {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 16px
+    }
+
+    .stat-panel {
+      flex: 1 1 280px;
+      background: #fff;
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      padding: 14px
+    }
+
+    .stat-panel h3 {
+      margin: 0 0 10px;
+      color: #0b5e28
+    }
+
+    .stat-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .stat-panel li {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      color: #2f2f2f
+    }
+
+    .chart-list li {
+      flex-direction: column;
+      gap: 4px
+    }
+
+    .chart-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      color: #2b4634
+    }
+
+    .chart-progress {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #eaf4ee;
+      overflow: hidden
+    }
+
+    .chart-progress span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #0b8e4d, #63c586)
+    }
+
+    .chart-small {
+      font-size: 0.78rem;
+      color: #6b6b6b
+    }
+
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      min-height: 150px
+    }
+
+    .bar-chart .bar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #4a4a4a
+    }
+
+    .bar-chart .bar-fill {
+      width: 18px;
+      background: linear-gradient(180deg, #63c586, #0b8e4d);
+      border-radius: 6px 6px 0 0;
+      margin-bottom: 6px
+    }
+
+    .chart-empty {
+      color: #6f6f6f;
+      font-size: 0.9rem
+    }
+
+    @media (max-width:900px) {
+      .pedidos-card {
+        padding: 18px
+      }
+
+      table.pedidos-table th,
+      table.pedidos-table td {
+        padding: 10px
+      }
+    }
   </style>
 </head>
+
 <body class="pedidos-page">
   <div class="pedidos-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+    <div
+      style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
       <div>
         <h1>Lista de pedidos</h1>
         <p class="small">Vista de administración — solo usuarios autenticados pueden ver y gestionar pedidos.</p>
       </div>
       <div id="adminSessionPanel" style="text-align:right;min-width:140px;max-width:480px;">
-        <div id="adminSessionContent" style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:4px;">
-          <img id="adminAvatar" src="" alt="avatar" style="width:40px;height:40px;border-radius:999px;display:none;object-fit:cover;border:2px solid rgba(0,0,0,0.06)">
+        <div id="adminSessionContent"
+          style="display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:4px;">
+          <img id="adminAvatar" src="" alt="avatar"
+            style="width:40px;height:40px;border-radius:999px;display:none;object-fit:cover;border:2px solid rgba(0,0,0,0.06)">
           <div style="text-align:left;min-width:90px;max-width:160px;overflow:hidden;">
-            <div id="adminName" style="font-weight:700;color:#063;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">Invitado</div>
-            <div id="adminEmail" style="font-size:0.75rem;color:#3b3b3b;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">-</div>
+            <div id="adminName"
+              style="font-weight:700;color:#063;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">Invitado
+            </div>
+            <div id="adminEmail"
+              style="font-size:0.75rem;color:#3b3b3b;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">-</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-            <div id="adminPrivileges" style="font-size:0.75rem;color:#2f6a3d;white-space:nowrap">Privilegios: administrador</div>
+            <div id="adminPrivileges" style="font-size:0.75rem;color:#2f6a3d;white-space:nowrap">Privilegios:
+              administrador</div>
             <div style="display:flex;gap:8px">
               <a href="/admin.html" class="btn" style="padding:6px 10px;font-size:0.9rem">Productos</a>
-              <button id="btnLogout" class="btn" style="background:#fff;color:var(--green);padding:6px 10px;font-size:0.9rem">Cerrar sesión</button>
-              <button id="btnArchiveToday" class="btn secondary" title="Archivar pedidos del día" style="padding:6px 10px;font-size:0.9rem">Archivar hoy</button>
-              <button id="btnShowLive" class="btn" title="Volver a la lista actual (hoy)" style="padding:6px 10px;font-size:0.9rem;display:none">Lista actual - Hoy</button>
+              <button id="btnLogout" class="btn"
+                style="background:#fff;color:var(--green);padding:6px 10px;font-size:0.9rem">Cerrar sesión</button>
+              <button id="btnShowLive" class="btn" title="Volver a la lista actual (hoy)"
+                style="padding:6px 10px;font-size:0.9rem;display:none">Lista actual - Hoy</button>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <div class="stats-section">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Ingresos (30d)</div>
-          <div class="stat-value" id="statRevenue">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Pedidos</div>
-          <div class="stat-value" id="statOrders">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Productos vendidos</div>
-          <div class="stat-value" id="statItems">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Ticket promedio</div>
-          <div class="stat-value" id="statAvg">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Utilidad estimada</div>
-          <div class="stat-value" id="statProfit">-</div>
-        </div>
-      </div>
-      <div class="stats-flex">
-        <div class="stat-panel">
-          <h3>Top productos (30 días)</h3>
-          <ul id="topProductsList"><li>Cargando...</li></ul>
-        </div>
-        <div class="stat-panel">
-          <h3>Métodos de pago</h3>
-          <ul id="paymentBreakdown" class="chart-list"><li>Cargando...</li></ul>
-        </div>
-        <div class="stat-panel">
-          <h3>Actividad por hora</h3>
-          <div id="hourlyChart" class="bar-chart"><div class="chart-empty">Cargando...</div></div>
-        </div>
-        <div class="stat-panel">
-          <h3>Categorías destacadas</h3>
-          <ul id="categoryBreakdown" class="chart-list"><li>Cargando...</li></ul>
-        </div>
-      </div>
+    <div style="margin:16px 0 24px">
+      <a href="/estadisticas.html" class="btn" style="padding:10px 12px;font-weight:700">Estadísticas del mes</a>
     </div>
     <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;">
       <div style="flex:0 0 100%;">
@@ -123,10 +318,18 @@
         <div style="background:#fafafa;border:1px solid #eee;padding:8px;border-radius:8px;">
           <table id="archivesTable" style="width:100%;border-collapse:collapse;font-size:0.95rem;">
             <thead>
-              <tr style="text-align:left;color:#063;font-weight:700"><th style="padding:6px 8px">Fecha</th><th style="padding:6px 8px">Pedidos</th><th style="padding:6px 8px">Total</th><th style="padding:6px 8px">Archivado por</th><th style="padding:6px 8px">Acciones</th></tr>
+              <tr style="text-align:left;color:#063;font-weight:700">
+                <th style="padding:6px 8px">Fecha</th>
+                <th style="padding:6px 8px">Pedidos</th>
+                <th style="padding:6px 8px">Total</th>
+                <th style="padding:6px 8px">Archivado por</th>
+                <th style="padding:6px 8px">Acciones</th>
+              </tr>
             </thead>
             <tbody id="archivesBody">
-              <tr><td colspan="5" style="padding:8px;color:#666">Cargando listas archivadas...</td></tr>
+              <tr>
+                <td colspan="5" style="padding:8px;color:#666">Cargando listas archivadas...</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -136,7 +339,16 @@
     <div class="table-wrap">
       <table class="pedidos-table" aria-label="Lista de pedidos">
         <thead>
-          <tr><th>ID</th><th>Cliente</th><th>Origen</th><th>Items</th><th>Total</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr>
+          <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Origen</th>
+            <th>Items</th>
+            <th>Total</th>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
         </thead>
         <tbody id="tabla"></tbody>
       </table>
@@ -154,149 +366,10 @@
       catch (e) { return '$' + Number(value || 0).toFixed(0); }
     }
 
-    async function loadStats(range = '30d') {
-      try {
-        const qs = encodeURIComponent(range);
-        const [overviewRes, productsRes, hourlyRes, categoryRes] = await Promise.all([
-          fetch(`/api/admin/stats/overview?range=${qs}`, { credentials: 'same-origin' }),
-          fetch(`/api/admin/stats/top-products?range=${qs}&limit=5`, { credentials: 'same-origin' }),
-          fetch(`/api/admin/stats/hourly-sales?range=${qs}`, { credentials: 'same-origin' }),
-          fetch(`/api/admin/stats/category-sales?range=${qs}&limit=6`, { credentials: 'same-origin' })
-        ]);
-        if (overviewRes.ok) {
-          const data = await overviewRes.json();
-          const overview = data.overview || {};
-          document.getElementById('statRevenue').textContent = formatCurrency(overview.totalRevenue || 0);
-          document.getElementById('statOrders').textContent = overview.ordersCount || 0;
-          document.getElementById('statItems').textContent = overview.itemsSold || 0;
-          const avg = (overview.totalRevenue && overview.ordersCount) ? (overview.totalRevenue / Math.max(overview.ordersCount, 1)) : 0;
-          document.getElementById('statAvg').textContent = formatCurrency(avg || 0);
-          document.getElementById('statProfit').textContent = formatCurrency(overview.profit || 0);
-          renderPaymentBreakdown(data.paymentBreakdown || []);
-        } else {
-          renderPaymentBreakdown([]);
-        }
-        if (productsRes.ok) {
-          const data = await productsRes.json();
-          renderTopProducts(data.products || []);
-        } else {
-          renderTopProducts([]);
-        }
-        if (hourlyRes.ok) {
-          const data = await hourlyRes.json();
-          renderHourlyChart(data.buckets || []);
-        } else {
-          renderHourlyChart([]);
-        }
-        if (categoryRes.ok) {
-          const data = await categoryRes.json();
-          renderCategoryBreakdown(data.categories || []);
-        } else {
-          renderCategoryBreakdown([]);
-        }
-      } catch (e) {
-        console.warn('loadStats error', e);
-      }
-    }
 
-    function renderTopProducts(products) {
-      const list = document.getElementById('topProductsList');
-      if (!list) return;
-      list.innerHTML = '';
-      if (!products.length) {
-        list.innerHTML = '<li>Sin datos</li>';
-        return;
-      }
-      products.forEach(prod => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span>${prod.nombre}</span><span>${Number(prod.cantidad || 0).toFixed(0)} · ${formatCurrency(prod.total || 0)}</span>`;
-        list.appendChild(li);
-      });
-    }
-
-    function renderPaymentBreakdown(breakdown) {
-      const list = document.getElementById('paymentBreakdown');
-      if (!list) return;
-      list.innerHTML = '';
-      if (!breakdown.length) {
-        list.innerHTML = '<li>Sin datos</li>';
-        return;
-      }
-      const total = breakdown.reduce((sum, item) => sum + (item.total || 0), 0) || 1;
-      breakdown.forEach(item => {
-        const pct = Math.round(((item.total || 0) / total) * 100);
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <div class="chart-row">
-            <span>${item.payment_method || 'Desconocido'}</span>
-            <span>${pct}%</span>
-          </div>
-          <div class="chart-progress"><span style="width:${pct}%"></span></div>
-          <div class="chart-small">${item.orders || 0} pedidos · ${formatCurrency(item.total || 0)}</div>
-        `;
-        list.appendChild(li);
-      });
-    }
-
-    function renderHourlyChart(buckets) {
-      const container = document.getElementById('hourlyChart');
-      if (!container) return;
-      container.innerHTML = '';
-      if (!buckets.length) {
-        container.innerHTML = '<div class="chart-empty">Sin datos</div>';
-        return;
-      }
-      const sample = buckets.slice(-12);
-      const maxTotal = Math.max(...sample.map(b => Number(b.total || 0)), 1);
-      const chartHeight = 120;
-      sample.forEach(bucket => {
-        const total = Number(bucket.total || 0);
-        const height = Math.max(8, Math.round((total / maxTotal) * chartHeight));
-        const bar = document.createElement('div');
-        bar.className = 'bar';
-        bar.innerHTML = `<span class="bar-fill" style="height:${height}px"></span><small>${formatHourLabel(bucket.hour)}</small>`;
-        bar.title = `${formatCurrency(total)} · ${bucket.orders || 0} pedidos`;
-        container.appendChild(bar);
-      });
-    }
-
-    function renderCategoryBreakdown(categories) {
-      const list = document.getElementById('categoryBreakdown');
-      if (!list) return;
-      list.innerHTML = '';
-      if (!categories.length) {
-        list.innerHTML = '<li>Sin datos</li>';
-        return;
-      }
-      const total = categories.reduce((sum, cat) => sum + (cat.total || 0), 0) || 1;
-      categories.forEach(cat => {
-        const pct = Math.round(((cat.total || 0) / total) * 100);
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <div class="chart-row">
-            <span>${cat.categoria || 'Sin categoría'}</span>
-            <span>${pct}%</span>
-          </div>
-          <div class="chart-progress"><span style="width:${pct}%"></span></div>
-          <div class="chart-small">${Number(cat.unidades || 0).toFixed(0)} uds · ${formatCurrency(cat.total || 0)}</div>
-        `;
-        list.appendChild(li);
-      });
-    }
-
-    function formatHourLabel(value) {
-      if (!value) return '--';
-      try {
-        const d = new Date(value);
-        const h = String(d.getHours()).padStart(2, '0');
-        return `${h}h`;
-      } catch (e) {
-        return '--';
-      }
-    }
 
     async function ensureAdmin() {
-      try{
+      try {
         const r = await fetch('/api/admin/session', { credentials: 'same-origin' });
         if (!r.ok) { window.location.href = '/admin-login.html'; return false; }
         const j = await r.json();
@@ -317,9 +390,9 @@
         } else { avatarEl.style.display = 'none'; }
         if (j.admin.privileges) privEl.textContent = 'Privilegios: ' + j.admin.privileges;
         else privEl.textContent = 'Privilegios: administrador';
-        logoutBtn.onclick = async ()=>{ await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }); window.location.href = '/admin-login.html'; };
+        logoutBtn.onclick = async () => { await fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' }); window.location.href = '/admin-login.html'; };
         return true;
-      }catch(e){ console.warn('ensureAdmin error', e); window.location.href = '/admin-login.html'; return false; }
+      } catch (e) { console.warn('ensureAdmin error', e); window.location.href = '/admin-login.html'; return false; }
     }
 
     async function cargar() {
@@ -337,21 +410,21 @@
     function renderPedidos(pedidos) {
       const tabla = document.getElementById('tabla');
       tabla.innerHTML = '';
-      (pedidos||[]).slice().reverse().forEach(p=>{
+      (pedidos || []).slice().reverse().forEach(p => {
         const tr = document.createElement('tr');
-        const itemsHTML = (p.items||[]).map(i=> (i.cantidad||i.qty||1) + ' x ' + (i.nombre||i.name||i.product_code||i.product_code||'' )).join('<br>');
-        const rawSource = (p.metadata && p.metadata.source) || p.source || p.origin || (p.paymentIntentId? 'mobile' : 'web') || 'web';
+        const itemsHTML = (p.items || []).map(i => (i.cantidad || i.qty || 1) + ' x ' + (i.nombre || i.name || i.product_code || i.product_code || '')).join('<br>');
+        const rawSource = (p.metadata && p.metadata.source) || p.source || p.origin || (p.paymentIntentId ? 'mobile' : 'web') || 'web';
         const source = String(rawSource || '').toLowerCase() || 'web';
         const sourceClass = source === 'mobile' ? 'origin-mobile' : (source === 'web' ? 'origin-web' : 'origin-unknown');
         const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
-        const estadoRaw = String(p.estado||p.status||'').trim();
+        const estadoRaw = String(p.estado || p.status || '').trim();
         const estadoSafe = estadoRaw.toLowerCase();
         let estadoClass = 'status-pendiente';
         if (estadoSafe.includes('listo')) estadoClass = 'status-listo';
         else if (estadoSafe.includes('prepar')) estadoClass = 'status-preparacion';
         tr.innerHTML = `
           <td>${p.id}</td>
-          <td>${p.cliente || p.customer_name || ''}<div class="small">${p.email || (p.metadata&&p.metadata.email) || ''}</div></td>
+          <td>${p.cliente || p.customer_name || ''}<div class="small">${p.email || (p.metadata && p.metadata.email) || ''}</div></td>
           <td><span class="origin-badge ${sourceClass}">${sourceLabel}</span></td>
           <td>${itemsHTML}</td>
           <td>${formatCurrency(p.total)}</td>
@@ -367,8 +440,8 @@
       });
 
       // attach handlers
-      tabla.querySelectorAll('button[data-action]').forEach(btn=>{
-        btn.onclick = async (ev)=>{
+      tabla.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.onclick = async (ev) => {
           const id = btn.getAttribute('data-id');
           const action = btn.getAttribute('data-action');
           if (action === 'preparacion') return actualizar(id, 'En preparación');
@@ -376,44 +449,44 @@
           if (action === 'notify') {
             await actualizar(id, 'Listo');
             // call server notify to send email if available
-            try{
-              const r = await fetch('/api/pedidos/' + encodeURIComponent(id) + '/notify', { method:'POST', credentials:'same-origin' });
-              if (!r.ok) { const e = await r.json().catch(()=>({})); console.warn('Notify failed', e); }
-            }catch(e){ console.warn('Notify error', e); }
+            try {
+              const r = await fetch('/api/pedidos/' + encodeURIComponent(id) + '/notify', { method: 'POST', credentials: 'same-origin' });
+              if (!r.ok) { const e = await r.json().catch(() => ({})); console.warn('Notify failed', e); }
+            } catch (e) { console.warn('Notify error', e); }
           }
         };
       });
     }
 
     async function actualizar(id, estado) {
-      try{
+      try {
         const res = await fetch('/api/pedidos/' + encodeURIComponent(id), {
           method: 'PATCH',
           credentials: 'same-origin',
-          headers: {'Content-Type':'application/json'},
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estado })
         });
         if (!res.ok) {
-          const err = await res.json().catch(()=>({ error: 'Unknown' }));
+          const err = await res.json().catch(() => ({ error: 'Unknown' }));
           alert('No se pudo actualizar el estado: ' + (err.error || JSON.stringify(err)));
           return;
         }
-        const j = await res.json().catch(()=>null);
+        const j = await res.json().catch(() => null);
         const estadoText = j && j.pedido && j.pedido.estado ? j.pedido.estado : estado;
-        const el = document.getElementById('estado-'+id);
-        if (el) el.innerHTML = `<span class="status-badge ${String(estadoText).toLowerCase().includes('listo')? 'status-listo': (String(estadoText).toLowerCase().includes('prepar')? 'status-preparacion':'status-pendiente')}">${estadoText}</span>`;
-      }catch(e){ alert('Error al actualizar: '+(e.message||e)); }
+        const el = document.getElementById('estado-' + id);
+        if (el) el.innerHTML = `<span class="status-badge ${String(estadoText).toLowerCase().includes('listo') ? 'status-listo' : (String(estadoText).toLowerCase().includes('prepar') ? 'status-preparacion' : 'status-pendiente')}">${estadoText}</span>`;
+      } catch (e) { alert('Error al actualizar: ' + (e.message || e)); }
     }
 
     // ARCHIVE: fetch list of archived dates
     async function fetchArchives() {
-      try{
+      try {
         const r = await fetch('/api/admin/archives', { credentials: 'same-origin' });
         if (!r.ok) return;
         const j = await r.json();
         const body = document.getElementById('archivesBody');
         body.innerHTML = '';
-        (j.archives||[]).forEach(a=>{
+        (j.archives || []).forEach(a => {
           const totalText = a.summary && typeof a.summary.totalAmount !== 'undefined'
             ? formatCurrency(a.summary.totalAmount)
             : '-';
@@ -430,19 +503,18 @@
           `;
           body.appendChild(tr);
         });
-        if (!(j.archives||[]).length) body.innerHTML = '<tr><td colspan="5" style="padding:8px;color:#666">No hay listas archivadas</td></tr>';
-      }catch(e){ console.warn('fetchArchives error', e); }
+        if (!(j.archives || []).length) body.innerHTML = '<tr><td colspan="5" style="padding:8px;color:#666">No hay listas archivadas</td></tr>';
+      } catch (e) { console.warn('fetchArchives error', e); }
     }
 
     async function loadArchive(date) {
       if (!date) return;
-      try{
+      try {
         const r = await fetch('/api/admin/archives/' + encodeURIComponent(date), { credentials: 'same-origin' });
-        if (!r.ok) { const err = await r.json().catch(()=>({})); alert('No se pudo cargar archivo: '+(err.error||r.status)); return; }
+        if (!r.ok) { const err = await r.json().catch(() => ({})); alert('No se pudo cargar archivo: ' + (err.error || r.status)); return; }
         const j = await r.json();
         isViewingArchive = true; currentArchiveDate = date;
         document.getElementById('btnShowLive').style.display = 'inline-block';
-        document.getElementById('btnArchiveToday').style.display = 'none';
         const summary = j.summary || null;
         if (summary) {
           document.getElementById('archiveInfo').textContent = `Mostrando lista archivada ${date} — Pedidos: ${summary.totalOrders} · Total: ${formatCurrency(summary.totalAmount)}`;
@@ -450,41 +522,23 @@
           document.getElementById('archiveInfo').textContent = 'Mostrando lista archivada: ' + date;
         }
         // map archived orders to a uniform structure
-        const orders = (j.orders||[]).map(o=>({ id: o.id || o.original_order_id || o.id, cliente: o.cliente || (o.metadata&&o.metadata.customer_name) || o.customer_name || o.customer || '', items: o.items || [], total: o.total || 0, fecha: o.archived_at || o.created_at || null, estado: o.estado || o.status || 'archivado', metadata: o.metadata || {}, source: (o.metadata && o.metadata.source) || o.source || null }));
+        const orders = (j.orders || []).map(o => ({ id: o.id || o.original_order_id || o.id, cliente: o.cliente || (o.metadata && o.metadata.customer_name) || o.customer_name || o.customer || '', items: o.items || [], total: o.total || 0, fecha: o.archived_at || o.created_at || null, estado: o.estado || o.status || 'archivado', metadata: o.metadata || {}, source: (o.metadata && o.metadata.source) || o.source || null }));
         renderPedidos(orders);
-      }catch(e){ console.error('loadArchive error', e); alert('Error cargando archive'); }
-    }
-
-    async function archiveToday() {
-      if (!confirm('¿Archivar todos los pedidos del día actual? Esta acción moverá las órdenes a archivo y limpiará la lista actual.')) return;
-      try{
-        const r = await fetch('/api/admin/archive-today', { method: 'POST', credentials: 'same-origin' });
-        if (!r.ok) { const err = await r.json().catch(()=>({})); alert('Error archivando: '+(err.error||r.status)); return; }
-        const j = await r.json();
-        await fetchArchives();
-        if (j.archive_date || j.archived_at) {
-          const d = j.archive_date || (j.archived_at||'').slice(0,10);
-          if (d) { await loadArchive(d); return; }
-        }
-        alert('Archivado completado. Refresca la lista para ver cambios.');
-        // refresh live if not viewing archive
-        if (!isViewingArchive) cargar();
-      }catch(e){ console.error('archiveToday error', e); alert('Error al archivar'); }
+      } catch (e) { console.error('loadArchive error', e); alert('Error cargando archive'); }
     }
 
     function showLiveList() {
       isViewingArchive = false; currentArchiveDate = null;
       document.getElementById('btnShowLive').style.display = 'none';
-      document.getElementById('btnArchiveToday').style.display = 'inline-block';
       document.getElementById('archiveInfo').textContent = '';
       cargar();
     }
 
     // attach UI handlers
-    (function attachUI(){
-      document.addEventListener('DOMContentLoaded', ()=>{
+    (function attachUI() {
+      document.addEventListener('DOMContentLoaded', () => {
         const table = document.getElementById('archivesTable');
-        table.addEventListener('click', (ev)=>{
+        table.addEventListener('click', (ev) => {
           const v = ev.target.getAttribute && (ev.target.getAttribute('data-archive-view') || ev.target.getAttribute('data-archive-delete'));
           if (!v) return;
           if (ev.target.getAttribute('data-archive-view')) {
@@ -492,19 +546,19 @@
           } else if (ev.target.getAttribute('data-archive-delete')) {
             if (!confirm('¿Eliminar la lista archivada de fecha ' + v + '? Esta acción es irreversible.')) return;
             fetch('/api/admin/archives/' + encodeURIComponent(v), { method: 'DELETE', credentials: 'same-origin' })
-              .then(r=>r.json()).then(j=>{ if (j && j.ok) { alert('Archivo eliminado'); fetchArchives(); showLiveList(); } else { alert('No se pudo eliminar: ' + (j && j.error)); } }).catch(e=>{ alert('Error al eliminar'); });
+              .then(r => r.json()).then(j => { if (j && j.ok) { alert('Archivo eliminado'); fetchArchives(); showLiveList(); } else { alert('No se pudo eliminar: ' + (j && j.error)); } }).catch(e => { alert('Error al eliminar'); });
           }
         });
-        document.getElementById('btnArchiveToday').onclick = archiveToday;
         document.getElementById('btnShowLive').onclick = showLiveList;
       });
     })();
 
     // initial load: fetch archives and live pedidos; refresh live every 5s only when not viewing archive
-    (async ()=>{ await ensureAdmin(); await fetchArchives(); await cargar(); await loadStats(); setInterval(()=>{ if (!isViewingArchive) cargar(); }, 5000); })();
+    (async () => { await ensureAdmin(); await fetchArchives(); await cargar(); setInterval(() => { if (!isViewingArchive) cargar(); }, 5000); })();
 
   </script>
 </body>
+
 </html>
 
 <script src="/scripts/input_filter.js"></script>

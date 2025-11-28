@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Estadísticas - Admin</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        :root {
+            --green: #0b8e4d;
+            --accent: #34a853;
+            --muted: #6b6b6b
+        }
+
+        body.pedidos-page {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 12px;
+            background: linear-gradient(140deg, #0b8e4d 0%, #34a853 55%, #0b5e28 100%);
+        }
+
+        .pedidos-card {
+            width: 100%;
+            max-width: 1100px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 30px 60px rgba(6, 62, 30, 0.22);
+        }
+
+        .pedidos-card h1 {
+            margin: 0 0 12px;
+            color: var(--green)
+        }
+
+        .table-wrap {
+            overflow: auto
+        }
+
+        table.pedidos-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 860px
+        }
+
+        table.pedidos-table th,
+        table.pedidos-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+            vertical-align: middle
+        }
+
+        table.pedidos-table th {
+            background: linear-gradient(90deg, rgba(11, 94, 42, 0.06), rgba(11, 94, 42, 0.02));
+            color: var(--green);
+            font-weight: 600
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px
+        }
+
+        .btn {
+            background: var(--green);
+            color: #fff;
+            border: 0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600
+        }
+
+        .btn.secondary {
+            background: #f0ad4e
+        }
+
+        .btn.danger {
+            background: #d9534f
+        }
+
+        .status-badge {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            display: inline-block
+        }
+
+        .status-pendiente {
+            background: #fff3cd;
+            color: #856404
+        }
+
+        .status-preparacion {
+            background: #cfe2ff;
+            color: #084298
+        }
+
+        .status-listo {
+            background: #d1e7dd;
+            color: #0f5132
+        }
+
+        .small {
+            font-size: 0.9rem;
+            color: var(--muted)
+        }
+
+        .origin-badge {
+            padding: 6px 8px;
+            border-radius: 999px;
+            font-weight: 700;
+            display: inline-block;
+            font-size: 0.85rem
+        }
+
+        .origin-web {
+            background: #e6f7ec;
+            color: #0b8e4d
+        }
+
+        .origin-mobile {
+            background: #fff4e6;
+            color: #d97706
+        }
+
+        .origin-unknown {
+            background: #f0f0f0;
+            color: #666
+        }
+
+        .stats-section {
+            margin: 16px 0 24px
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px
+        }
+
+        .stat-card {
+            background: #f6fbf7;
+            border: 1px solid #e0f1e6;
+            border-radius: 12px;
+            padding: 12px
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #26613a;
+            text-transform: uppercase;
+            letter-spacing: 0.05em
+        }
+
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #0b7040;
+            margin-top: 6px
+        }
+
+        .stats-flex {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 16px
+        }
+
+        .stat-panel {
+            flex: 1 1 280px;
+            background: #fff;
+            border: 1px solid #e6e6e6;
+            border-radius: 12px;
+            padding: 14px
+        }
+
+        .stat-panel h3 {
+            margin: 0 0 10px;
+            color: #0b5e28
+        }
+
+        .stat-panel ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .stat-panel li {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+            color: #2f2f2f
+        }
+
+        .chart-list li {
+            flex-direction: column;
+            gap: 4px
+        }
+
+        .chart-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #2b4634
+        }
+
+        .chart-progress {
+            width: 100%;
+            Height: 6px;
+            border-radius: 999px;
+            background: #eaf4ee;
+            overflow: hidden
+        }
+
+        .chart-progress span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #0b8e4d, #63c586)
+        }
+
+        .chart-small {
+            font-size: 0.78rem;
+            color: #6b6b6b
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            min-height: 150px
+        }
+
+        .bar-chart .bar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #4a4a4a
+        }
+
+        .bar-chart .bar-fill {
+            width: 18px;
+            background: linear-gradient(180deg, #63c586, #0b8e4d);
+            border-radius: 6px 6px 0 0;
+            margin-bottom: 6px
+        }
+
+        .chart-empty {
+            color: #6f6f6f;
+            font-size: 0.9rem
+        }
+
+        @media (max-width:900px) {
+            .pedidos-card {
+                padding: 18px
+            }
+
+            table.pedidos-table th,
+            table.pedidos-table td {
+                padding: 10px
+            }
+        }
+    </style>
+</head>
+
+<body class="pedidos-page">
+    <div class="pedidos-card">
+        <div
+            style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+            <div>
+                <h1>Estadísticas</h1>
+                <p class="small">Estadísticas del mes — vista de administración.</p>
+            </div>
+            <div style="text-align:right;min-width:140px;max-width:480px;">
+                <a href="/pedidos.html" class="btn" style="padding:8px 10px">Volver a pedidos</a>
+            </div>
+        </div>
+
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Ingresos (30d)</div>
+                    <div class="stat-value" id="statRevenue">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pedidos</div>
+                    <div class="stat-value" id="statOrders">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Productos vendidos</div>
+                    <div class="stat-value" id="statItems">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Ticket promedio</div>
+                    <div class="stat-value" id="statAvg">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Utilidad estimada</div>
+                    <div class="stat-value" id="statProfit">-</div>
+                </div>
+            </div>
+            <div class="stats-flex">
+                <div class="stat-panel">
+                    <h3>Top productos (30 días)</h3>
+                    <ul id="topProductsList">
+                        <li>Cargando...</li>
+                    </ul>
+                </div>
+                <div class="stat-panel">
+                    <h3>Métodos de pago</h3>
+                    <ul id="paymentBreakdown" class="chart-list">
+                        <li>Cargando...</li>
+                    </ul>
+                </div>
+                <div class="stat-panel">
+                    <h3>Actividad por hora</h3>
+                    <div id="hourlyChart" class="bar-chart">
+                        <div class="chart-empty">Cargando...</div>
+                    </div>
+                </div>
+                <div class="stat-panel">
+                    <h3>Categorías destacadas</h3>
+                    <ul id="categoryBreakdown" class="chart-list">
+                        <li>Cargando...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const currencyFormatter = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+        function formatCurrency(value) {
+            try { return currencyFormatter.format(Number(value || 0)); }
+            catch (e) { return '$' + Number(value || 0).toFixed(0); }
+        }
+
+        async function loadStats(range = '30d') {
+            try {
+                const qs = encodeURIComponent(range);
+                const [overviewRes, productsRes, hourlyRes, categoryRes] = await Promise.all([
+                    fetch(`/api/admin/stats/overview?range=${qs}`, { credentials: 'same-origin' }),
+                    fetch(`/api/admin/stats/top-products?range=${qs}&limit=5`, { credentials: 'same-origin' }),
+                    fetch(`/api/admin/stats/hourly-sales?range=${qs}`, { credentials: 'same-origin' }),
+                    fetch(`/api/admin/stats/category-sales?range=${qs}&limit=6`, { credentials: 'same-origin' })
+                ]);
+                if (overviewRes.ok) {
+                    const data = await overviewRes.json();
+                    const overview = data.overview || {};
+                    document.getElementById('statRevenue').textContent = formatCurrency(overview.totalRevenue || 0);
+                    document.getElementById('statOrders').textContent = overview.ordersCount || 0;
+                    document.getElementById('statItems').textContent = overview.itemsSold || 0;
+                    const avg = (overview.totalRevenue && overview.ordersCount) ? (overview.totalRevenue / Math.max(overview.ordersCount, 1)) : 0;
+                    document.getElementById('statAvg').textContent = formatCurrency(avg || 0);
+                    document.getElementById('statProfit').textContent = formatCurrency(overview.profit || 0);
+                    renderPaymentBreakdown(data.paymentBreakdown || []);
+                } else {
+                    renderPaymentBreakdown([]);
+                }
+                if (productsRes.ok) {
+                    const data = await productsRes.json();
+                    renderTopProducts(data.products || []);
+                } else {
+                    renderTopProducts([]);
+                }
+                if (hourlyRes.ok) {
+                    const data = await hourlyRes.json();
+                    renderHourlyChart(data.buckets || []);
+                } else {
+                    renderHourlyChart([]);
+                }
+                if (categoryRes.ok) {
+                    const data = await categoryRes.json();
+                    renderCategoryBreakdown(data.categories || []);
+                } else {
+                    renderCategoryBreakdown([]);
+                }
+            } catch (e) {
+                console.warn('loadStats error', e);
+            }
+        }
+
+        function renderTopProducts(products) {
+            const list = document.getElementById('topProductsList');
+            if (!list) return;
+            list.innerHTML = '';
+            if (!products.length) {
+                list.innerHTML = '<li>Sin datos</li>';
+                return;
+            }
+            products.forEach(prod => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${prod.nombre}</span><span>${Number(prod.cantidad || 0).toFixed(0)} · ${formatCurrency(prod.total || 0)}</span>`;
+                list.appendChild(li);
+            });
+        }
+
+        function renderPaymentBreakdown(breakdown) {
+            const list = document.getElementById('paymentBreakdown');
+            if (!list) return;
+            list.innerHTML = '';
+            if (!breakdown.length) {
+                list.innerHTML = '<li>Sin datos</li>';
+                return;
+            }
+            const total = breakdown.reduce((sum, item) => sum + (item.total || 0), 0) || 1;
+            breakdown.forEach(item => {
+                const pct = Math.round(((item.total || 0) / total) * 100);
+                const li = document.createElement('li');
+                li.innerHTML = `
+          <div class="chart-row">
+            <span>${item.payment_method || 'Desconocido'}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="chart-progress"><span style="width:${pct}%"></span></div>
+          <div class="chart-small">${item.orders || 0} pedidos · ${formatCurrency(item.total || 0)}</div>
+        `;
+                list.appendChild(li);
+            });
+        }
+
+        function renderHourlyChart(buckets) {
+            const container = document.getElementById('hourlyChart');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!buckets.length) {
+                container.innerHTML = '<div class="chart-empty">Sin datos</div>';
+                return;
+            }
+            const sample = buckets.slice(-12);
+            const maxTotal = Math.max(...sample.map(b => Number(b.total || 0)), 1);
+            const chartHeight = 120;
+            sample.forEach(bucket => {
+                const total = Number(bucket.total || 0);
+                const height = Math.max(8, Math.round((total / maxTotal) * chartHeight));
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                bar.innerHTML = `<span class="bar-fill" style="height:${height}px"></span><small>${formatHourLabel(bucket.hour)}</small>`;
+                bar.title = `${formatCurrency(total)} · ${bucket.orders || 0} pedidos`;
+                container.appendChild(bar);
+            });
+        }
+
+        function renderCategoryBreakdown(categories) {
+            const list = document.getElementById('categoryBreakdown');
+            if (!list) return;
+            list.innerHTML = '';
+            if (!categories.length) {
+                list.innerHTML = '<li>Sin datos</li>';
+                return;
+            }
+            const total = categories.reduce((sum, cat) => sum + (cat.total || 0), 0) || 1;
+            categories.forEach(cat => {
+                const pct = Math.round(((cat.total || 0) / total) * 100);
+                const li = document.createElement('li');
+                li.innerHTML = `
+          <div class="chart-row">
+            <span>${cat.categoria || 'Sin categoría'}</span>
+            <span>${pct}%</span>
+          </div>
+          <div class="chart-progress"><span style="width:${pct}%"></span></div>
+          <div class="chart-small">${Number(cat.unidades || 0).toFixed(0)} uds · ${formatCurrency(cat.total || 0)}</div>
+        `;
+                list.appendChild(li);
+            });
+        }
+
+        function formatHourLabel(value) {
+            if (!value) return '--';
+            try {
+                const d = new Date(value);
+                const h = String(d.getHours()).padStart(2, '0');
+                return `${h}h`;
+            } catch (e) {
+                return '--';
+            }
+        }
+
+        async function ensureAdmin() {
+            try {
+                const r = await fetch('/api/admin/session', { credentials: 'same-origin' });
+                if (!r.ok) { window.location.href = '/admin-login.html'; return false; }
+                const j = await r.json();
+                if (!j || !j.admin) { window.location.href = '/admin-login.html'; return false; }
+                return true;
+            } catch (e) { console.warn('ensureAdmin error', e); window.location.href = '/admin-login.html'; return false; }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const ok = await ensureAdmin();
+            if (!ok) return;
+            await loadStats();
+        });
+    </script>
+</body>
+
+</html>

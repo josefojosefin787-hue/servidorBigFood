@@ -256,6 +256,16 @@ const archiveDateFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit'
 });
 
+const AUTO_ARCHIVE_HOUR = Number.isFinite(Number(process.env.AUTO_ARCHIVE_HOUR))
+  ? Number(process.env.AUTO_ARCHIVE_HOUR)
+  : 23;
+const AUTO_ARCHIVE_MINUTE = Number.isFinite(Number(process.env.AUTO_ARCHIVE_MINUTE))
+  ? Number(process.env.AUTO_ARCHIVE_MINUTE)
+  : 59;
+const AUTO_ARCHIVE_MIN_DELAY_MS = 60 * 1000; // evitar intervalos demasiado cortos al reprogramar
+let autoArchiveTimeout = null;
+let lastAutoArchiveDate = null;
+
 function normalizeArchiveDate(inputDate) {
   if (inputDate && /^\d{4}-\d{2}-\d{2}$/.test(String(inputDate))) return String(inputDate);
   const baseDate = inputDate ? new Date(inputDate) : new Date();
@@ -605,6 +615,97 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
   } finally {
     client.release();
   }
+}
+
+function msUntilNextArchive() {
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(AUTO_ARCHIVE_HOUR, AUTO_ARCHIVE_MINUTE, 0, 0);
+  if (target <= now) {
+    target.setDate(target.getDate() + 1);
+  }
+  const diff = target.getTime() - now.getTime();
+  return diff > AUTO_ARCHIVE_MIN_DELAY_MS ? diff : AUTO_ARCHIVE_MIN_DELAY_MS;
+}
+
+async function detectLastArchivedDate() {
+  const pool = app.locals.db;
+  if (pool) {
+    try {
+      const r = await pool.query('SELECT archive_date::text AS archive_date FROM order_archives ORDER BY archive_date DESC LIMIT 1');
+      if (r.rows && r.rows.length) return r.rows[0].archive_date;
+    } catch (e) {
+      console.warn('[AUTO-ARCHIVE] No se pudo obtener la última fecha archivada desde la base de datos:', e.message || e);
+    }
+  }
+  try {
+    const files = fs.readdirSync(ARCHIVE_DIR).filter(f => f.endsWith('.json')).sort();
+    if (!files.length) return null;
+    const latestFile = files[files.length - 1];
+    const raw = fs.readFileSync(path.join(ARCHIVE_DIR, latestFile), 'utf8');
+    const obj = JSON.parse(raw);
+    return obj.archive_date || deriveArchiveDateFromKey(obj.archive_key || latestFile.replace(/\.json$/, ''));
+  } catch (e) {
+    console.warn('[AUTO-ARCHIVE] No se pudo determinar la última fecha archivada desde archivos:', e.message || e);
+  }
+  return null;
+}
+
+async function runAutomaticArchive(trigger = 'scheduled') {
+  const archiveDate = normalizeArchiveDate();
+  if (lastAutoArchiveDate === archiveDate) {
+    return;
+  }
+  try {
+    if (app.locals.db) {
+      const result = await archiveOrdersInDb(app.locals.db, 'auto-scheduler', archiveDate);
+      if (result.archived) {
+        console.log(`[AUTO-ARCHIVE] Archivados ${result.archived} pedidos (${archiveDate}) por programador automático (${trigger}).`);
+      } else {
+        console.log(`[AUTO-ARCHIVE] No se encontraron pedidos activos para archivar (${archiveDate}).`);
+      }
+    } else {
+      const fileResult = archivarYLimpiarPedidos('auto-scheduler', archiveDate);
+      if (fileResult.archivar) {
+        console.log(`[AUTO-ARCHIVE] Archivados ${fileResult.count} pedidos (${archiveDate}) usando archivos (${trigger}).`);
+      } else {
+        console.log(`[AUTO-ARCHIVE] No había pedidos que archivar (${archiveDate}).`);
+      }
+    }
+    lastAutoArchiveDate = archiveDate;
+  } catch (e) {
+    console.error(`[AUTO-ARCHIVE] Error durante el archivado automático (${trigger}):`, e.message || e);
+  }
+}
+
+function scheduleNextAutomaticArchive() {
+  const delay = msUntilNextArchive();
+  if (autoArchiveTimeout) clearTimeout(autoArchiveTimeout);
+  console.log(`[AUTO-ARCHIVE] Próximo archivado automático en ${(delay / (60 * 1000)).toFixed(1)} minutos.`);
+  autoArchiveTimeout = setTimeout(async () => {
+    await runAutomaticArchive('timer');
+    scheduleNextAutomaticArchive();
+  }, delay);
+}
+
+async function initializeAutomaticArchive() {
+  try {
+    lastAutoArchiveDate = await detectLastArchivedDate();
+  } catch (e) {
+    lastAutoArchiveDate = null;
+  }
+  try {
+    const today = normalizeArchiveDate();
+    const now = new Date();
+    const target = new Date(now);
+    target.setHours(AUTO_ARCHIVE_HOUR, AUTO_ARCHIVE_MINUTE, 0, 0);
+    if (now >= target && lastAutoArchiveDate !== today) {
+      await runAutomaticArchive('startup');
+    }
+  } catch (e) {
+    console.warn('[AUTO-ARCHIVE] No se pudo ejecutar verificación inicial:', e.message || e);
+  }
+  scheduleNextAutomaticArchive();
 }
 
 
@@ -2745,6 +2846,11 @@ const PORT = process.env.PORT || 3000;
 if (process.env.FORCE_PORT_3001 === 'true') {
   process.env.PORT = '3001';
 }
+
+initializeAutomaticArchive().catch(e => {
+  console.error('[AUTO-ARCHIVE] No se pudo inicializar el programador automático:', e && e.message ? e.message : e);
+});
+
 app.listen(PORT, () => {
   console.log(`Servidor API corriendo en http://localhost:${PORT}`);
 });
