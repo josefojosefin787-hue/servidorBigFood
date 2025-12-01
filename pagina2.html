@@ -151,6 +151,36 @@
       width: 95%
     }
 
+    .cart-modal .modal-box {
+      border: 2px solid #1a7841;
+      background: #fff;
+      text-align: center;
+      padding: 26px 24px
+    }
+
+    .cart-modal__title {
+      margin: 0;
+      color: #1a7841;
+      font-size: 1.25rem
+    }
+
+    .cart-modal__message {
+      margin: 12px 0 22px;
+      color: #333;
+      font-size: 1rem
+    }
+
+    .cart-modal__actions {
+      display: flex;
+      justify-content: center
+    }
+
+    .cart-modal__actions .btn-submit {
+      width: auto;
+      min-width: 140px;
+      margin-top: 0
+    }
+
     .modal-box img {
       width: 120px;
       height: 120px;
@@ -261,6 +291,16 @@
     </div>
   </div>
 
+  <div id="cartWarningModal" class="modal cart-modal" role="alertdialog" aria-modal="true" aria-hidden="true" aria-labelledby="cartModalTitle" aria-describedby="cartModalMessage">
+    <div class="modal-box" role="document">
+      <h3 id="cartModalTitle" class="cart-modal__title">Aviso</h3>
+      <p id="cartModalMessage" class="cart-modal__message">Mensaje de advertencia.</p>
+      <div class="cart-modal__actions">
+        <button id="cartModalClose" type="button" class="btn-submit">Entendido</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Basic client implementation that uses the same API as the original app.
     const API_PRODUCTS = '/api/products?onlyAvailable=true';
@@ -311,6 +351,27 @@
     // Banned modal
     function showBanned(token) { document.getElementById('bannedMessage').textContent = `Se detectó: "${token}". Cámbiala para continuar.`; document.getElementById('bannedModal').classList.add('active'); document.getElementById('bannedModal').setAttribute('aria-hidden', 'false'); }
     document.getElementById('bannedOk').addEventListener('click', () => { document.getElementById('bannedModal').classList.remove('active'); document.getElementById('bannedModal').setAttribute('aria-hidden', 'true'); });
+
+    // Cart validation modal
+    const cartWarningModal = document.getElementById('cartWarningModal');
+    const cartModalMessage = document.getElementById('cartModalMessage');
+    const cartModalClose = document.getElementById('cartModalClose');
+
+    function showCartModal(message) {
+      cartModalMessage.textContent = message;
+      cartWarningModal.classList.add('active');
+      cartWarningModal.setAttribute('aria-hidden', 'false');
+      cartModalClose.focus();
+    }
+
+    function hideCartModal() {
+      cartWarningModal.classList.remove('active');
+      cartWarningModal.setAttribute('aria-hidden', 'true');
+    }
+
+    cartModalClose.addEventListener('click', hideCartModal);
+    cartWarningModal.addEventListener('click', evt => { if (evt.target === cartWarningModal) hideCartModal(); });
+    document.addEventListener('keydown', evt => { if (evt.key === 'Escape' && cartWarningModal.classList.contains('active')) hideCartModal(); });
 
     // --- Service Worker & Push subscription helpers ---
     function urlBase64ToUint8Array(base64String) {
@@ -390,9 +451,9 @@
       // simple validation & banned-words
       const banned = findBannedInText(cliente) || findBannedInText(nota) || findBannedInText(email);
       if (banned) { showBanned(banned); return; }
-      if (!cliente) { alert('Ingresa tu nombre'); return; }
-      if (!email) { alert('Ingresa un correo válido'); return; }
-      if (!cart.length) { alert('Carrito vacío'); return; }
+      if (!cliente) { showCartModal('Por favor ingresa tu nombre'); return; }
+      if (!email) { showCartModal('Por favor ingrese un correo válido'); return; }
+      if (!cart.length) { showCartModal('carrito vacio'); return; }
       try {
         if (metodo === 'card') {
           const res = await fetch('/api/create-checkout-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cliente, email, items: cart, nota }) });
