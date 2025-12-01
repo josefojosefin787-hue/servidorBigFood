@@ -342,6 +342,58 @@
 
       attachImgLimit(tr.querySelector('.cell-img-edit'));
 
+      const actionsCell = tr.querySelector('.cell-actions');
+      const uploadBtn = document.createElement('button');
+      uploadBtn.className = 'admin-button admin-button-small btn-upload';
+      uploadBtn.type = 'button';
+      uploadBtn.textContent = 'Subir imagen';
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'file';
+      hiddenInput.accept = 'image/*';
+      hiddenInput.style.display = 'none';
+      actionsCell.appendChild(uploadBtn);
+      actionsCell.appendChild(hiddenInput);
+      const imgCell = tr.querySelector('.cell-img-edit');
+
+      const resetUploadState = () => {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Subir imagen';
+        hiddenInput.value = '';
+      };
+
+      uploadBtn.addEventListener('click', () => hiddenInput.click());
+
+      hiddenInput.addEventListener('change', async () => {
+        const file = hiddenInput.files && hiddenInput.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('image', file);
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Subiendo...';
+        try {
+          const res = await fetch(`/api/admin/products/${product.id}/image`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || 'Error en la subida');
+          }
+          const data = await res.json();
+          const url = data.imageUrl || data.url;
+          if (url) {
+            imgCell.textContent = url;
+            imgCell.title = url;
+          }
+          if (typeof onSaved === 'function') await onSaved();
+        } catch (err) {
+          alert('No se pudo subir la imagen: ' + (err.message || err));
+        } finally {
+          resetUploadState();
+        }
+      });
+
       tr.querySelector('.btn-save').addEventListener('click', async () => {
         const nombre = tr.querySelector('.cell-nombre').textContent.trim();
         const img = tr.querySelector('.cell-img-edit').textContent.trim();

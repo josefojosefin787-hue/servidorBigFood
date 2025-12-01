@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const multer = require('multer');
 require('dotenv').config(); // 👈 carga las variables del .env
 // Centralizar la inicialización del pool de Postgres en lib/db.js
 const db = require('./lib/db');
@@ -41,6 +42,36 @@ try {
 } catch (e) {
   console.warn('bcrypt no está instalado — la comparación de contraseñas seguras no estará disponible.');
 }
+
+let cloudinary = null;
+let cloudinaryReady = false;
+try {
+  const cloudinaryLib = require('cloudinary');
+  cloudinary = cloudinaryLib.v2;
+  if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+    cloudinaryReady = true;
+  } else {
+    console.warn('Variables de entorno de Cloudinary incompletas — subir imágenes no estará disponible.');
+  }
+} catch (e) {
+  console.warn('cloudinary no está instalado — las subidas a Cloudinary estarán deshabilitadas.');
+}
+
+const MAX_UPLOAD_BYTES = (() => {
+  const fromEnv = Number(process.env.UPLOAD_MAX_BYTES);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 5 * 1024 * 1024;
+})();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES }
+});
 
 let OAuth2Client = null;
 let googleClient = null;
@@ -148,8 +179,8 @@ app.use((req, res, next) => {
 // Rechaza cualquier petición cuya URL, query, params o body contenga palabras/fragmentos en la lista.
 {
   const BANNED = [
-    'mierda', 'hijo de puta', 'puta madre', 'puta', 'cabron', 'fuck', 'shit','tula', 'pichula', 'weon', 'webon', 'conchetumare', 'conchetumadre', 'putito', 'pablo', 'brian', 'pene', 'culo', 'raja', 'tetita','milf',
-    'drop database', 'drop table', 'delete from', 'truncate', 'insert', 'update', 'alter table', 'exec ', 'union select', 'or 1=1', '--', '/**/', 
+    'mierda', 'hijo de puta', 'puta madre', 'puta', 'cabron', 'fuck', 'shit', 'tula', 'pichula', 'weon', 'webon', 'conchetumare', 'conchetumadre', 'putito', 'pablo', 'brian', 'pene', 'culo', 'raja', 'tetita', 'milf',
+    'drop database', 'drop table', 'delete from', 'truncate', 'insert', 'update', 'alter table', 'exec ', 'union select', 'or 1=1', '--', '/**/',
   ];
   // Safely escape all regex metacharacters. Use a standard character class that
   // includes backslash and the common metacharacters. This prevents tokens like
@@ -610,7 +641,7 @@ async function archiveOrdersInDb(pool, actor, archiveDate) {
 
     return { archived: ordersSnapshot.length, archive_date: archiveDate, archive_key: archiveKey, archived_at: archivedAt, summary };
   } catch (e) {
-    await client.query('ROLLBACK').catch(()=>{});
+    await client.query('ROLLBACK').catch(() => { });
     throw e;
   } finally {
     client.release();
@@ -774,6 +805,87 @@ function leerProducts() {
 function guardarProducts(data) {
   fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(data, null, 2));
 }
+
+app.post('/api/admin/products/:id/image', upload.single('image'), async (req, res) => {
+  if (!cloudinary || !cloudinaryReady) {
+    return res.status(503).json({ error: 'Servicio de imágenes no configurado' });
+  }
+
+  const productId = Number(req.params.id);
+  if (!Number.isFinite(productId) || productId <= 0) {
+    return res.status(400).json({ error: 'ID de producto inválido' });
+  }
+
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ error: 'Archivo de imagen requerido' });
+  }
+
+  if (!String(req.file.mimetype || '').startsWith('image/')) {
+    return res.status(400).json({ error: 'Solo se permiten archivos de imagen' });
+  }
+
+  const folder = process.env.CLOUDINARY_FOLDER || 'bigfood';
+  let publicId = null;
+
+  try {
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder, resource_type: 'image' },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+      stream.end(req.file.buffer);
+    });
+
+    const secureUrl = uploadResult && uploadResult.secure_url ? uploadResult.secure_url : null;
+    publicId = uploadResult && uploadResult.public_id ? uploadResult.public_id : null;
+    if (!secureUrl) {
+      throw new Error('Cloudinary no devolvió una URL segura');
+    }
+
+    const pool = app.locals.db;
+    let productPayload = null;
+    if (pool) {
+      const updateSql = 'UPDATE products SET image = $1 WHERE id = $2 RETURNING id, name, category, price, available, image, description';
+      const updateRes = await pool.query(updateSql, [secureUrl, productId]);
+      if (!updateRes.rows.length) {
+        if (publicId) {
+          cloudinary.uploader.destroy(publicId).catch(() => { /* ignore rollback errors */ });
+        }
+        return res.status(404).json({ error: 'Producto no encontrado' });
+      }
+      const row = updateRes.rows[0];
+      productPayload = {
+        id: row.id,
+        nombre: row.name,
+        categoria: row.category,
+        precio: typeof row.price !== 'undefined' ? Number(row.price) : null,
+        disponible: typeof row.available !== 'undefined' ? row.available : true,
+        img: row.image,
+        description: row.description || null
+      };
+    } else {
+      const data = leerProducts();
+      const idx = Array.isArray(data.products) ? data.products.findIndex(p => p.id === productId) : -1;
+      if (idx === -1) {
+        if (publicId) {
+          cloudinary.uploader.destroy(publicId).catch(() => { /* ignore rollback errors */ });
+        }
+        return res.status(404).json({ error: 'Producto no encontrado' });
+      }
+      data.products[idx].img = secureUrl;
+      guardarProducts(data);
+      productPayload = data.products[idx];
+    }
+
+    return res.json({ ok: true, imageUrl: secureUrl, publicId, product: productPayload });
+  } catch (err) {
+    console.error('[API] Error subiendo imagen de producto:', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'No se pudo subir la imagen', detail: err && err.message ? err.message : String(err) });
+  }
+});
 
 // Listar productos o filtrar por categoría
 app.get('/api/products', (req, res) => {
@@ -957,7 +1069,7 @@ app.get('/api/admin/archives', async (req, res) => {
         } catch (e) {
           return { date: f.replace(/\.json$/, ''), count: 0, archived_by: null, file: f };
         }
-      }).sort((a,b)=> b.date.localeCompare(a.date));
+      }).sort((a, b) => b.date.localeCompare(a.date));
       return res.json({ ok: true, method: 'file', archives: list });
     } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   }
@@ -985,7 +1097,7 @@ app.get('/api/admin/archives', async (req, res) => {
       return res.json({ ok: true, method: 'db-fallback', archives: fallbackArchives });
     } catch (err) {
       console.error('Error listando archives (fallback):', err.message || err);
-      return res.status(500).json({ ok:false, error: err.message });
+      return res.status(500).json({ ok: false, error: err.message });
     }
   }
 });
@@ -995,12 +1107,12 @@ app.get('/api/admin/archives', async (req, res) => {
 app.get('/api/admin/archives/:id', async (req, res) => {
   const pool = app.locals.db;
   const identifier = String(req.params.id || '').trim();
-  if (!identifier) return res.status(400).json({ ok:false, error: 'Identificador de archivo requerido' });
+  if (!identifier) return res.status(400).json({ ok: false, error: 'Identificador de archivo requerido' });
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(identifier);
 
   if (!pool) {
     const filePath = resolveArchiveFile(identifier);
-    if (!filePath) return res.status(404).json({ ok:false, error: 'Archivo de archive no encontrado' });
+    if (!filePath) return res.status(404).json({ ok: false, error: 'Archivo de archive no encontrado' });
     try {
       const raw = fs.readFileSync(filePath);
       const obj = JSON.parse(raw);
@@ -1008,7 +1120,7 @@ app.get('/api/admin/archives/:id', async (req, res) => {
       const archiveKey = obj.archive_key || identifier;
       const archiveDate = obj.archive_date || deriveArchiveDateFromKey(archiveKey);
       return res.json({ ok: true, method: 'file', archive_key: archiveKey, date: archiveDate, archived_at: obj.archived_at || null, archived_by: obj.archived_by || null, summary: obj.summary || null, orders });
-    } catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
+    } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   }
 
   try {
@@ -1031,7 +1143,7 @@ app.get('/api/admin/archives/:id', async (req, res) => {
       : `SELECT original_order_id, items, total, archived_at, metadata FROM archived_orders WHERE metadata->>'archive_key' = $1 ORDER BY archived_at DESC`;
     const fallbackRows = await pool.query(fallbackQ, fallbackParams);
     if (!fallbackRows.rows.length) {
-      return res.status(404).json({ ok:false, error: 'Archivo no encontrado' });
+      return res.status(404).json({ ok: false, error: 'Archivo no encontrado' });
     }
     const archiveDate = isDateOnly ? identifier : deriveArchiveDateFromKey(identifier);
     const orders = fallbackRows.rows.map(row => {
@@ -1047,7 +1159,7 @@ app.get('/api/admin/archives/:id', async (req, res) => {
       });
     });
     return res.json({ ok: true, method: 'db-fallback', archive_key: identifier, date: archiveDate, archived_at: orders[0]?.archived_at || null, archived_by: null, orders });
-  } catch (e) { console.error('Error obteniendo archive date:', e.message || e); return res.status(500).json({ ok:false, error: e.message }); }
+  } catch (e) { console.error('Error obteniendo archive date:', e.message || e); return res.status(500).json({ ok: false, error: e.message }); }
 });
 
 
@@ -1055,16 +1167,16 @@ app.get('/api/admin/archives/:id', async (req, res) => {
 app.delete('/api/admin/archives/:id', async (req, res) => {
   const pool = app.locals.db;
   const identifier = String(req.params.id || '').trim();
-  if (!identifier) return res.status(400).json({ ok:false, error: 'Identificador requerido' });
+  if (!identifier) return res.status(400).json({ ok: false, error: 'Identificador requerido' });
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(identifier);
 
   if (!pool) {
     const filePath = resolveArchiveFile(identifier);
-    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ ok:false, error: 'Archivo de archive no encontrado' });
+    if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ ok: false, error: 'Archivo de archive no encontrado' });
     try {
       fs.unlinkSync(filePath);
       return res.json({ ok: true, method: 'file', id: identifier, message: 'Archivo archivado eliminado' });
-    } catch (e) { return res.status(500).json({ ok:false, error: e.message }); }
+    } catch (e) { return res.status(500).json({ ok: false, error: e.message }); }
   }
 
   const client = await pool.connect();
@@ -1088,9 +1200,9 @@ app.delete('/api/admin/archives/:id', async (req, res) => {
     await client.query('COMMIT');
     return res.json({ ok: true, method: 'db', id: identifier, deleted_lists: deletedKeys.length, deleted_orders: delOrders.rowCount || 0 });
   } catch (e) {
-    await client.query('ROLLBACK').catch(()=>{});
+    await client.query('ROLLBACK').catch(() => { });
     console.error('Error eliminando archived_orders/order_archives:', e.message || e);
-    return res.status(500).json({ ok:false, error: e.message });
+    return res.status(500).json({ ok: false, error: e.message });
   } finally {
     client.release();
   }
@@ -1559,7 +1671,7 @@ let mailTransport = null;
       }
 
       mailTransport = nodemailer.createTransport(transportOptions);
-      
+
       console.log('Verificando configuración de SMTP...');
       await mailTransport.verify();
       console.log('SMTP transport configurado y verificado correctamente. Host:', transportOptions.host);
@@ -1793,7 +1905,7 @@ app.post('/api/create-payment-intent', async (req, res) => {
       let items = pedidoMeta.items || pedidoMeta.pedido || null;
       // items might be a JSON string
       if (typeof items === 'string') {
-        try { items = JSON.parse(items); } catch(e) { /* keep as string if not JSON */ }
+        try { items = JSON.parse(items); } catch (e) { /* keep as string if not JSON */ }
       }
       const totalFromReq = Number(amount) || (pedidoMeta.amount ? Number(pedidoMeta.amount) : null);
 
@@ -1872,39 +1984,39 @@ app.post('/api/create-payment-intent', async (req, res) => {
 });
 
 
-  // --- ¡NUEVO ENDPOINT PARA LA APLICACIÓN MÓVIL! ---
-  // Este endpoint es exclusivo para la app y no afectará a la web.
-  app.post('/api/create-payment-intent-mobile', async (req, res) => {
-    try {
-      const { amount } = req.body;
+// --- ¡NUEVO ENDPOINT PARA LA APLICACIÓN MÓVIL! ---
+// Este endpoint es exclusivo para la app y no afectará a la web.
+app.post('/api/create-payment-intent-mobile', async (req, res) => {
+  try {
+    const { amount } = req.body;
 
-      // 1. Validación robusta del monto
-      if (amount == null || amount <= 0) {
-        console.log("MOBILE: Solicitud rechazada: El monto es inválido o nulo:", amount);
-        return res.status(400).json({ error: 'Monto inválido.' });
-      }
-
-      console.log(`MOBILE: Creando PaymentIntent para el monto: ${amount}`);
-
-      // 2. Creación del PaymentIntent con la moneda correcta para la app
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount), // Aseguramos que sea un número entero
-        currency: 'clp',            // Moneda específica para la app móvil
-        automatic_payment_methods: {
-          enabled: true,
-        },
-      });
-
-      console.log("MOBILE: PaymentIntent creado con éxito.");
-      res.json({
-        clientSecret: paymentIntent.client_secret
-      });
-
-    } catch (error) {
-      console.error("MOBILE: Error al crear PaymentIntent:", error.message);
-      res.status(500).json({ error: 'Error interno del servidor al contactar a Stripe.' });
+    // 1. Validación robusta del monto
+    if (amount == null || amount <= 0) {
+      console.log("MOBILE: Solicitud rechazada: El monto es inválido o nulo:", amount);
+      return res.status(400).json({ error: 'Monto inválido.' });
     }
-  });
+
+    console.log(`MOBILE: Creando PaymentIntent para el monto: ${amount}`);
+
+    // 2. Creación del PaymentIntent con la moneda correcta para la app
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(amount), // Aseguramos que sea un número entero
+      currency: 'clp',            // Moneda específica para la app móvil
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log("MOBILE: PaymentIntent creado con éxito.");
+    res.json({
+      clientSecret: paymentIntent.client_secret
+    });
+
+  } catch (error) {
+    console.error("MOBILE: Error al crear PaymentIntent:", error.message);
+    res.status(500).json({ error: 'Error interno del servidor al contactar a Stripe.' });
+  }
+});
 
 // Endpoint simple para exponer la publishable key al frontend (código sin cambios)
 app.get('/api/config', (req, res) => {
@@ -2011,14 +2123,14 @@ app.post('/stripe-webhook-mobile-app', express.raw({ type: 'application/json' })
     try {
       // 2. INTENTO DE PARSEAR LA METADATA
       if (!intent.metadata.pedido) {
-          throw new Error("La metadata 'pedido' está vacía o no existe.");
+        throw new Error("La metadata 'pedido' está vacía o no existe.");
       }
       orderDetails = JSON.parse(intent.metadata.pedido);
       console.log("Metadata parseada correctamente (móvil):", orderDetails);
 
       // Verificación de campos esenciales
       if (!orderDetails.clientName || !orderDetails.items || !orderDetails.amount) {
-          throw new Error("Faltan datos esenciales en la metadata (clientName, items, o amount).");
+        throw new Error("Faltan datos esenciales en la metadata (clientName, items, o amount).");
       }
 
       // 3. BLOQUE TRY...CATCH PARA LA BASE DE DATOS
@@ -2220,11 +2332,11 @@ app.post('/admin/simulate-payment', async (req, res) => {
 
     // enviar correo si es posible
     if (mailTransport && pedido.email) {
-      const html = `<h2>Comprobante de pago - Pedido #${pedido.id}</h2><p>Cliente: ${pedido.cliente}</p><ul>${pedido.items.map(i=>`<li>${i.cantidad} x ${i.nombre} - $${i.precio * i.cantidad}</li>`).join('')}</ul><p><strong>Total: $${pedido.total}</strong></p>`;
+      const html = `<h2>Comprobante de pago - Pedido #${pedido.id}</h2><p>Cliente: ${pedido.cliente}</p><ul>${pedido.items.map(i => `<li>${i.cantidad} x ${i.nombre} - $${i.precio * i.cantidad}</li>`).join('')}</ul><p><strong>Total: $${pedido.total}</strong></p>`;
       const info = await mailTransport.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@example.com', to: pedido.email, subject: `Comprobante de pago - Pedido #${pedido.id}`, html });
-  console.log('Simulated payment mail sent:', info.messageId);
-  if (nodemailer && nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
-            if (nodemailer && nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+      console.log('Simulated payment mail sent:', info.messageId);
+      if (nodemailer && nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+      if (nodemailer && nodemailer.getTestMessageUrl) console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
     }
 
     return res.json({ status: 'ok', pedido });
